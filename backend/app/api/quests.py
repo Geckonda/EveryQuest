@@ -3,30 +3,15 @@ from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import select
-from sqlalchemy.orm import Session
 
-from app.crud import apply_changes, get_owned
+from app.crud import apply_changes, check_quest_refs, get_owned
 from app.db import DbSession
 from app.deps import CurrentUser
 from app.economy import lock_user, record_transaction, utcnow
-from app.models import Category, Quest, Tier, User
+from app.models import Quest
 from app.schemas import QuestCompleted, QuestCreate, QuestOut, QuestStatus, QuestUpdate
 
 router = APIRouter(prefix="/quests", tags=["quests"])
-
-
-def _check_refs(db: Session, user: User, tier_id: int, category_id: int | None) -> Tier:
-    """Тир и категория должны быть свои и не в архиве."""
-    tier = db.get(Tier, tier_id)
-    if tier is None or tier.user_id != user.id or tier.is_archived:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Тир не найден или в архиве")
-    if category_id is not None:
-        category = db.get(Category, category_id)
-        if category is None or category.user_id != user.id or category.is_archived:
-            raise HTTPException(
-                status.HTTP_422_UNPROCESSABLE_ENTITY, "Категория не найдена или в архиве"
-            )
-    return tier
 
 
 def _check_due_at(due_at: datetime | None) -> None:
@@ -73,7 +58,7 @@ def list_quests(
 
 @router.post("", status_code=status.HTTP_201_CREATED)
 def create_quest(data: QuestCreate, user: CurrentUser, db: DbSession) -> QuestOut:
-    tier = _check_refs(db, user, data.tier_id, data.category_id)
+    tier = check_quest_refs(db, user, data.tier_id, data.category_id)
     _check_due_at(data.due_at)
     quest = Quest(
         user_id=user.id,
@@ -98,7 +83,7 @@ def update_quest(quest_id: int, data: QuestUpdate, user: CurrentUser, db: DbSess
     changes = data.changes()
 
     if "tier_id" in changes or "category_id" in changes:
-        tier = _check_refs(
+        tier = check_quest_refs(
             db,
             user,
             changes.get("tier_id", quest.tier_id),

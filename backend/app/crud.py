@@ -6,8 +6,22 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Quest, RecurringQuest, User
+from app.models import Category, Quest, RecurringQuest, Tier, User
 from app.schemas import ArchiveBlocker, ArchiveConflict
+
+
+def check_quest_refs(db: Session, user: User, tier_id: int, category_id: int | None) -> Tier:
+    """Тир и категория квеста или шаблона должны быть свои и не в архиве."""
+    tier = db.get(Tier, tier_id)
+    if tier is None or tier.user_id != user.id or tier.is_archived:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Тир не найден или в архиве")
+    if category_id is not None:
+        category = db.get(Category, category_id)
+        if category is None or category.user_id != user.id or category.is_archived:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_ENTITY, "Категория не найдена или в архиве"
+            )
+    return tier
 
 
 class Owned(Protocol):
