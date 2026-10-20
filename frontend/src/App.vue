@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, onUnmounted } from 'vue'
 import { RouterLink, RouterView, useRouter } from 'vue-router'
 import {
   NButton,
@@ -12,6 +12,7 @@ import {
   useOsTheme,
 } from 'naive-ui'
 import { useAuthStore } from '@/stores/auth'
+import { coins } from '@/utils/format'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -21,6 +22,7 @@ const theme = computed(() => (osTheme.value === 'dark' ? darkTheme : null))
 const navItems = [
   { to: '/', label: 'Квесты' },
   { to: '/rewards', label: 'Траты' },
+  { to: '/history', label: 'Журнал' },
   { to: '/settings', label: 'Настройки' },
 ]
 
@@ -28,6 +30,13 @@ function logout() {
   auth.logout()
   router.push({ name: 'login' })
 }
+
+// Вернулись во вкладку — баланс мог измениться (штрафы, другое устройство).
+function onVisibilityChange() {
+  if (document.visibilityState === 'visible' && auth.user) auth.fetchMe().catch(() => {})
+}
+onMounted(() => document.addEventListener('visibilitychange', onVisibilityChange))
+onUnmounted(() => document.removeEventListener('visibilitychange', onVisibilityChange))
 </script>
 
 <template>
@@ -38,7 +47,7 @@ function logout() {
           <span class="logo">Ежеквестик</span>
           <div v-if="auth.user" class="account">
             <span class="balance" :class="{ negative: auth.user.balance < 0 }">
-              {{ auth.user.balance }} монет
+              {{ coins(auth.user.balance) }}
             </span>
             <span class="username">{{ auth.user.username }}</span>
             <NButton size="small" quaternary @click="logout">Выйти</NButton>

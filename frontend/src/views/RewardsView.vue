@@ -1,16 +1,23 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
-import { NAlert, NSpin } from 'naive-ui'
+import { computed, onMounted, ref } from 'vue'
+import { NAlert, NButton, NSpin, useDialog, useMessage } from 'naive-ui'
 import type { Reward } from '@/api/types'
 import { errorMessage } from '@/api/errors'
+import { useAuthStore } from '@/stores/auth'
 import { useCatalogStore } from '@/stores/catalog'
 import { useArchiveToggle } from '@/composables/useArchiveToggle'
+import { coins } from '@/utils/format'
 import CatalogSection from '@/components/CatalogSection.vue'
 import RewardFormModal from '@/components/RewardFormModal.vue'
 
+const auth = useAuthStore()
 const catalog = useCatalogStore()
 const toggleArchive = useArchiveToggle()
+const dialog = useDialog()
+const message = useMessage()
 
+const balance = computed(() => auth.user?.balance ?? 0)
+const buyingId = ref<number | null>(null)
 const loading = ref(true)
 const loadError = ref<string | null>(null)
 const modal = ref(false)
@@ -29,6 +36,27 @@ onMounted(async () => {
 function open(reward: Reward | null) {
   edited.value = reward
   modal.value = true
+}
+
+function buy(reward: Reward) {
+  dialog.info({
+    title: 'Купить?',
+    content: `«${reward.name}» за ${coins(reward.price)}. Останется ${coins(balance.value - reward.price)}.`,
+    positiveText: 'Купить',
+    negativeText: 'Отмена',
+    onPositiveClick: async () => {
+      buyingId.value = reward.id
+      try {
+        await catalog.purchase(reward.id)
+        message.success(`Куплено: «${reward.name}». Приятного отдыха!`)
+      } catch (e) {
+        message.error(errorMessage(e))
+        await auth.fetchMe().catch(() => {})
+      } finally {
+        buyingId.value = null
+      }
+    },
+  })
 }
 </script>
 
@@ -55,12 +83,25 @@ function open(reward: Reward | null) {
             <div v-if="reward.description" class="muted">{{ reward.description }}</div>
           </div>
           <div class="meta">
-            <span class="price">{{ reward.price }} монет</span>
+            <span class="price">{{ coins(reward.price) }}</span>
             <span v-if="reward.duration_minutes" class="muted"
               >{{ reward.duration_minutes }} мин</span
             >
           </div>
         </div>
+      </template>
+      <template #actions="{ item: reward }">
+        <NButton
+          size="small"
+          type="primary"
+          secondary
+          :disabled="balance < reward.price"
+          :title="balance < reward.price ? `Не хватает ${reward.price - balance}` : undefined"
+          :loading="buyingId === reward.id"
+          @click="buy(reward)"
+        >
+          Купить
+        </NButton>
       </template>
     </CatalogSection>
   </NSpin>

@@ -54,6 +54,64 @@ export interface Reward {
 
 export type RewardPayload = Omit<Reward, 'id' | 'is_archived' | 'created_at'>
 
+export type QuestStatus = 'active' | 'completed' | 'failed' | 'archived'
+
+export interface Quest {
+  id: number
+  name: string
+  description: string | null
+  tier_id: number
+  category_id: number | null
+  recurring_quest_id: number | null
+  period_date: string | null
+  reward: number
+  penalty: number
+  status: QuestStatus
+  created_at: string
+  due_at: string | null
+  completed_at: string | null
+  penalty_applied: boolean
+}
+
+export interface QuestPayload {
+  name: string
+  description: string | null
+  tier_id: number
+  category_id: number | null
+  reward: number
+  penalty: number
+  due_at: string | null
+}
+
+export interface QuestCompleted {
+  quest: Quest
+  balance: number
+}
+
+export type TransactionType = 'quest_reward' | 'penalty' | 'purchase' | 'manual'
+
+export interface Transaction {
+  id: number
+  amount: number
+  type: TransactionType
+  quest_id: number | null
+  reward_id: number | null
+  note: string | null
+  balance_after: number
+  created_at: string
+  title: string | null
+}
+
+export interface TransactionPage {
+  items: Transaction[]
+  total: number
+}
+
+export interface BalanceChange {
+  transaction: Transaction
+  balance: number
+}
+
 export interface ArchiveBlocker {
   id: number
   name: string

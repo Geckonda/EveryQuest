@@ -16,6 +16,8 @@ defineEmits<{
 
 defineSlots<{
   item(props: { item: T }): unknown
+  /** Дополнительные кнопки для неархивного элемента (например, «Купить»). */
+  actions?(props: { item: T }): unknown
 }>()
 
 const showArchived = ref(false)
@@ -42,6 +44,7 @@ const visible = computed(() =>
           <slot name="item" :item="item" />
         </div>
         <div class="actions">
+          <slot v-if="!item.is_archived" name="actions" :item="item" />
           <NButton v-if="!item.is_archived" size="small" quaternary @click="$emit('edit', item)">
             Изменить
           </NButton>

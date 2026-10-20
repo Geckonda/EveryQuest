@@ -1,0 +1,182 @@
+<script setup lang="ts">
+import { onMounted, ref } from 'vue'
+import { NAlert, NButton, NEmpty, NSelect, NSpin } from 'naive-ui'
+import { api } from '@/api/client'
+import type { Transaction, TransactionPage, TransactionType } from '@/api/types'
+import { errorMessage } from '@/api/errors'
+import { formatDateTime, signed } from '@/utils/format'
+import ManualTransactionModal from '@/components/ManualTransactionModal.vue'
+
+const PAGE_SIZE = 50
+
+const TYPE_LABEL: Record<TransactionType, string> = {
+  quest_reward: 'Награда',
+  penalty: 'Штраф',
+  purchase: 'Покупка',
+  manual: 'Корректировка',
+}
+
+const typeOptions = [
+  { label: 'Все операции', value: 'all' },
+  ...Object.entries(TYPE_LABEL).map(([value, label]) => ({ label, value })),
+]
+
+const items = ref<Transaction[]>([])
+const total = ref(0)
+const filter = ref<TransactionType | 'all'>('all')
+const loading = ref(false)
+const error = ref<string | null>(null)
+const manualModal = ref(false)
+
+async function load(reset: boolean) {
+  loading.value = true
+  error.value = null
+  const params = new URLSearchParams({
+    limit: String(PAGE_SIZE),
+    offset: String(reset ? 0 : items.value.length),
+  })
+  if (filter.value !== 'all') params.set('type', filter.value)
+  try {
+    const page = await api.get<TransactionPage>(`/transactions?${params}`)
+    items.value = reset ? page.items : [...items.value, ...page.items]
+    total.value = page.total
+  } catch (e) {
+    error.value = errorMessage(e)
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(() => load(true))
+</script>
+
+<template>
+  <div class="title-row">
+    <h1>Журнал</h1>
+    <NButton size="small" @click="manualModal = true">Корректировка</NButton>
+  </div>
+
+  <NSelect
+    v-model:value="filter"
+    :options="typeOptions"
+    class="filter"
+    @update:value="load(true)"
+  />
+
+  <NAlert v-if="error" type="error">{{ error }}</NAlert>
+  <NSpin v-else :show="loading && !items.length">
+    <NEmpty v-if="!loading && !items.length" description="Операций пока нет" class="empty" />
+    <ul class="list">
+      <li v-for="t in items" :key="t.id">
+        <div class="text">
+          <div class="title">{{ t.title ?? TYPE_LABEL[t.type] }}</div>
+          <div class="muted">
+            <span v-if="t.title">{{ TYPE_LABEL[t.type] }} · </span
+            >{{ formatDateTime(t.created_at) }}
+          </div>
+          <div v-if="t.note" class="note">{{ t.note }}</div>
+        </div>
+        <div class="amounts">
+          <span class="amount" :class="t.amount > 0 ? 'plus' : 'minus'">{{
+            signed(t.amount)
+          }}</span>
+          <span class="muted">= {{ t.balance_after }}</span>
+        </div>
+      </li>
+    </ul>
+    <NButton
+      v-if="items.length < total"
+      block
+      quaternary
+      :loading="loading"
+      class="more"
+      @click="load(false)"
+    >
+      Показать ещё ({{ total - items.length }})
+    </NButton>
+  </NSpin>
+
+  <ManualTransactionModal v-model:show="manualModal" @saved="load(true)" />
+</template>
+
+<style scoped>
+.title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+h1 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.filter {
+  max-width: 240px;
+  margin-bottom: 8px;
+}
+
+.empty {
+  padding: 32px 0;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.text {
+  min-width: 0;
+}
+
+.title {
+  overflow-wrap: anywhere;
+}
+
+.note {
+  margin-top: 2px;
+  font-size: 0.875rem;
+  font-style: italic;
+  overflow-wrap: anywhere;
+}
+
+.amounts {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.amount {
+  font-weight: 600;
+}
+
+.amount.plus {
+  color: var(--color-ok);
+}
+
+.amount.minus {
+  color: var(--color-error);
+}
+
+.muted {
+  color: var(--color-muted);
+  font-size: 0.875rem;
+}
+
+.more {
+  margin-top: 8px;
+}
+</style>

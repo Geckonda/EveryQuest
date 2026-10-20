@@ -6,6 +6,7 @@
   --color-ok: #1a7f37;
   --color-error: #cf222e;
   --color-accent: #18a058;
+  --color-warning: #9a6700;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -17,6 +18,7 @@
     --color-ok: #3fb950;
     --color-error: #f85149;
     --color-accent: #63e2b7;
+    --color-warning: #d29922;
   }
 }
 

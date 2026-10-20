@@ -87,6 +87,11 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = null
   }
 
+  /** Баланс из ответа операции с монетами — без лишнего запроса /me. */
+  function setBalance(balance: number) {
+    if (user.value) user.value = { ...user.value, balance }
+  }
+
   return {
     accessToken,
     refreshToken,
@@ -97,5 +102,6 @@ export const useAuthStore = defineStore('auth', () => {
     register,
     fetchMe,
     logout,
+    setBalance,
   }
 })

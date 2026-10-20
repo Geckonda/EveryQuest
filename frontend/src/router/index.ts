@@ -23,6 +23,11 @@ const router = createRouter({
       component: () => import('../views/RewardsView.vue'),
     },
     {
+      path: '/history',
+      name: 'history',
+      component: () => import('../views/HistoryView.vue'),
+    },
+    {
       path: '/settings',
       name: 'settings',
       component: () => import('../views/SettingsView.vue'),

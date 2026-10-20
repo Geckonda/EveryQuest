@@ -2,6 +2,7 @@ import { computed, ref, type Ref } from 'vue'
 import { defineStore } from 'pinia'
 import { api } from '@/api/client'
 import type {
+  BalanceChange,
   Category,
   CategoryPayload,
   Reward,
@@ -82,6 +83,12 @@ export const useCatalogStore = defineStore('catalog', () => {
     return reward
   }
 
+  async function purchase(rewardId: number) {
+    const result = await api.post<BalanceChange>(`/rewards/${rewardId}/purchase`)
+    auth.setBalance(result.balance)
+    return result
+  }
+
   return {
     tiers,
     categories,
@@ -93,5 +100,6 @@ export const useCatalogStore = defineStore('catalog', () => {
     saveTier,
     saveCategory,
     saveReward,
+    purchase,
   }
 })
