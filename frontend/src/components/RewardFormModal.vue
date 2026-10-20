@@ -53,7 +53,7 @@ async function save() {
       name: form.name.trim(),
       description: form.description?.trim() || null,
     })
-    message.success(props.reward ? 'Трата сохранена' : 'Трата создана')
+    message.success(props.reward ? 'Меню обновлено' : 'Добавлено в меню таверны')
     show.value = false
   } catch (e) {
     error.value = errorMessage(e)
@@ -67,7 +67,7 @@ async function save() {
   <NModal
     v-model:show="show"
     preset="card"
-    :title="reward ? 'Изменить трату' : 'Новая трата'"
+    :title="reward ? 'Изменить позицию меню' : 'Новое в меню таверны'"
     class="form-modal"
   >
     <NForm @submit.prevent="save">
@@ -84,7 +84,7 @@ async function save() {
         />
       </NFormItem>
       <div class="row">
-        <NFormItem label="Цена, монет">
+        <NFormItem label="Цена, золотых">
           <NInputNumber v-model:value="form.price" :min="0" :precision="0" />
         </NFormItem>
         <NFormItem label="Длительность, мин">

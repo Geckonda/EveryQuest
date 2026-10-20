@@ -10,14 +10,14 @@ import ManualTransactionModal from '@/components/ManualTransactionModal.vue'
 const PAGE_SIZE = 50
 
 const TYPE_LABEL: Record<TransactionType, string> = {
-  quest_reward: 'Награда',
-  penalty: 'Штраф',
-  purchase: 'Покупка',
-  manual: 'Корректировка',
+  quest_reward: 'Награда за квест',
+  penalty: 'Штраф гильдии',
+  purchase: 'Заказ в таверне',
+  manual: 'Поправка казначея',
 }
 
 const typeOptions = [
-  { label: 'Все операции', value: 'all' },
+  { label: 'Все записи', value: 'all' },
   ...Object.entries(TYPE_LABEL).map(([value, label]) => ({ label, value })),
 ]
 
@@ -52,9 +52,13 @@ onMounted(() => load(true))
 
 <template>
   <div class="title-row">
-    <h1>Журнал</h1>
-    <NButton size="small" @click="manualModal = true">Корректировка</NButton>
+    <div>
+      <h1 class="page-title">Летопись</h1>
+      <p class="page-subtitle">Каждый золотой на счету</p>
+    </div>
+    <NButton size="small" @click="manualModal = true">Поправка</NButton>
   </div>
+  <div class="flourish">✦</div>
 
   <NSelect
     v-model:value="filter"
@@ -65,7 +69,11 @@ onMounted(() => load(true))
 
   <NAlert v-if="error" type="error">{{ error }}</NAlert>
   <NSpin v-else :show="loading && !items.length">
-    <NEmpty v-if="!loading && !items.length" description="Операций пока нет" class="empty" />
+    <NEmpty
+      v-if="!loading && !items.length"
+      description="Страницы летописи пока чисты"
+      class="empty"
+    />
     <ul class="list">
       <li v-for="t in items" :key="t.id">
         <div class="text">
@@ -76,11 +84,11 @@ onMounted(() => load(true))
           </div>
           <div v-if="t.note" class="note">{{ t.note }}</div>
         </div>
-        <div class="amounts">
+        <div class="amounts num">
           <span class="amount" :class="t.amount > 0 ? 'plus' : 'minus'">{{
             signed(t.amount)
           }}</span>
-          <span class="muted">= {{ t.balance_after }}</span>
+          <span class="muted">в кошеле {{ t.balance_after }}</span>
         </div>
       </li>
     </ul>
@@ -102,15 +110,9 @@ onMounted(() => load(true))
 <style scoped>
 .title-row {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 12px;
-}
-
-h1 {
-  margin: 0;
-  font-size: 1.5rem;
 }
 
 .filter {
@@ -133,7 +135,7 @@ h1 {
   justify-content: space-between;
   gap: 12px;
   padding: 10px 0;
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 1px dashed var(--color-rule);
 }
 
 .text {
@@ -141,6 +143,9 @@ h1 {
 }
 
 .title {
+  font-family: var(--font-heading);
+  font-size: 1.15rem;
+  font-weight: 700;
   overflow-wrap: anywhere;
 }
 
@@ -156,11 +161,11 @@ h1 {
   flex-direction: column;
   align-items: flex-end;
   flex: none;
-  font-variant-numeric: tabular-nums;
 }
 
 .amount {
-  font-weight: 600;
+  font-size: 1.1rem;
+  font-weight: 700;
 }
 
 .amount.plus {

@@ -64,7 +64,7 @@ async function save() {
 </script>
 
 <template>
-  <NModal v-model:show="show" preset="card" title="Ручная корректировка" class="form-modal">
+  <NModal v-model:show="show" preset="card" title="Поправка казначея" class="form-modal">
     <p class="hint">
       Для исправления ошибок: например, квест отмечен выполненным по ошибке. В минус вручную уйти
       нельзя.

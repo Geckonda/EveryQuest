@@ -3,6 +3,7 @@ import { onMounted, onUnmounted, ref } from 'vue'
 import { NAlert, NButton, NEmpty, NSpin, NTabPane, NTabs, useDialog, useMessage } from 'naive-ui'
 import type { Quest } from '@/api/types'
 import { errorMessage } from '@/api/errors'
+import { coins } from '@/utils/format'
 import { useCatalogStore } from '@/stores/catalog'
 import { useQuestsStore } from '@/stores/quests'
 import { useRecurringStore } from '@/stores/recurring'
@@ -77,7 +78,7 @@ async function complete(quest: Quest) {
   busyId.value = quest.id
   try {
     await quests.complete(quest.id)
-    message.success(`+${quest.reward} — «${quest.name}» выполнен`)
+    message.success(`Квест «${quest.name}» сдан. Награда: ${coins(quest.reward)}`)
   } catch (e) {
     message.error(errorMessage(e))
     await quests.loadActive().catch(() => {})
@@ -88,9 +89,9 @@ async function complete(quest: Quest) {
 
 function archive(quest: Quest) {
   dialog.warning({
-    title: 'Убрать квест?',
-    content: `«${quest.name}» исчезнет из списка без награды и без штрафа.`,
-    positiveText: 'Убрать',
+    title: 'Снять объявление с доски?',
+    content: `«${quest.name}» исчезнет без награды и без штрафа.`,
+    positiveText: 'Снять',
     negativeText: 'Отмена',
     onPositiveClick: async () => {
       try {
@@ -108,19 +109,23 @@ const categoryOf = (quest: Quest) => catalog.categories.find((c) => c.id === que
 
 <template>
   <div class="title-row">
-    <h1>Квесты</h1>
+    <div>
+      <h1 class="page-title">Доска квестов</h1>
+      <p class="page-subtitle">Любишь кататься — люби и саночки возить</p>
+    </div>
     <NButton type="primary" :disabled="loading || !!loadError" @click="open(null)">
-      Новый квест
+      Повесить квест
     </NButton>
   </div>
+  <div class="flourish">✦</div>
 
   <NAlert v-if="loadError" type="error">{{ loadError }}</NAlert>
   <NSpin v-else :show="loading">
     <NTabs type="line" animated @update:value="onTabChange">
-      <NTabPane name="active" :tab="`Активные (${quests.active.length})`">
+      <NTabPane name="active" :tab="`Открытые (${quests.active.length})`">
         <NEmpty
           v-if="!quests.active.length"
-          description="Активных квестов нет. Добавьте первый — и зарабатывайте монеты"
+          description="Доска пуста. Повесьте первый квест — и зарабатывайте золото на отдых"
           class="empty"
         />
         <QuestCard
@@ -136,11 +141,11 @@ const categoryOf = (quest: Quest) => catalog.categories.find((c) => c.id === que
           @archive="archive(quest)"
         />
       </NTabPane>
-      <NTabPane name="history" tab="История">
+      <NTabPane name="history" tab="Архив">
         <NSpin :show="historyLoading">
           <NEmpty
             v-if="historyLoaded && !quests.history.length"
-            description="Пока пусто"
+            description="Пока ни одного закрытого квеста"
             class="empty"
           />
           <QuestCard
@@ -167,15 +172,10 @@ const categoryOf = (quest: Quest) => catalog.categories.find((c) => c.id === que
 <style scoped>
 .title-row {
   display: flex;
-  align-items: center;
+  flex-wrap: wrap;
+  align-items: flex-end;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 8px;
-}
-
-h1 {
-  margin: 0;
-  font-size: 1.5rem;
 }
 
 .empty {

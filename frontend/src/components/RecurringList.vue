@@ -9,6 +9,8 @@ import { useArchiveToggle } from '@/composables/useArchiveToggle'
 import { dueLabel } from '@/utils/format'
 import { describeSchedule } from '@/utils/schedule'
 import CatalogSection from './CatalogSection.vue'
+import CoinIcon from './CoinIcon.vue'
+import TierSeal from './TierSeal.vue'
 import RecurringFormModal from './RecurringFormModal.vue'
 
 const catalog = useCatalogStore()
@@ -55,21 +57,14 @@ const tierOf = (t: RecurringQuest) => catalog.tiers.find((tier) => tier.id === t
   >
     <template #item="{ item: t }">
       <div class="head">
-        <span class="name">{{ t.name }}</span>
-        <NTag
-          v-if="tierOf(t)"
-          :color="{ color: tierOf(t)?.color ?? undefined, textColor: '#fff' }"
-          size="small"
-          :bordered="false"
-        >
-          {{ tierOf(t)?.name }}
-        </NTag>
+        <TierSeal v-if="tierOf(t)" :tier="tierOf(t)!" :size="28" />
+        <span class="name">↻ {{ t.name }}</span>
         <NTag v-if="!t.is_active && !t.is_archived" size="small">на паузе</NTag>
       </div>
       <div class="meta">
-        <span>{{ describeSchedule(t) }}</span>
-        <span class="reward">+{{ t.reward }}</span>
-        <span class="penalty">−{{ t.penalty }}</span>
+        <span class="schedule">{{ describeSchedule(t) }}</span>
+        <span class="reward num"><CoinIcon :size="14" /> +{{ t.reward }}</span>
+        <span v-if="t.penalty" class="penalty num">штраф {{ t.penalty }}</span>
       </div>
       <div v-if="t.next_due_at" class="muted">Следующий: {{ dueLabel(t.next_due_at).text }}</div>
       <div v-else-if="t.is_active && !t.is_archived" class="muted">Расписание закончилось</div>
@@ -93,24 +88,35 @@ const tierOf = (t: RecurringQuest) => catalog.tiers.find((tier) => tier.id === t
 }
 
 .name {
-  font-weight: 600;
+  font-family: var(--font-heading);
+  font-size: 1.2rem;
+  font-weight: 700;
   overflow-wrap: anywhere;
 }
 
 .meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px 12px;
+  align-items: center;
+  gap: 4px 14px;
   margin-top: 4px;
-  font-size: 0.875rem;
+}
+
+.schedule {
+  font-style: italic;
 }
 
 .reward {
-  color: var(--color-ok);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--color-gold);
+  font-weight: 700;
 }
 
 .penalty {
   color: var(--color-error);
+  font-size: 0.875rem;
 }
 
 .muted {

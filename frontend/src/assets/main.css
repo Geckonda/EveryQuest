@@ -1,30 +1,167 @@
+/*
+ * Тема «таверна». Светлая — пергамент и чернила, тёмная — дерево и свечи.
+ * Значения согласованы с src/theme.ts (Naive UI) — меняйте вместе.
+ */
 :root {
-  --color-bg: #ffffff;
-  --color-text: #1f2328;
-  --color-muted: #656d76;
-  --color-border: #d0d7de;
-  --color-ok: #1a7f37;
-  --color-error: #cf222e;
-  --color-accent: #18a058;
-  --color-warning: #9a6700;
+  --font-body: Alegreya, Georgia, 'Times New Roman', serif;
+  --font-heading: 'Cormorant Garamond', Georgia, serif;
+
+  --color-bg: #efe1bf;
+  --color-page: #fbf3dd;
+  --color-note: #fdf8ea;
+  --color-text: #33241a;
+  --color-muted: #7a6142;
+  --color-border: #c4a46c;
+  --color-rule: #d9c393;
+  --color-ok: #4d7326;
+  --color-error: #9b1f1f;
+  --color-accent: #8e2f1c;
+  --color-warning: #a8711a;
+  --color-gold: #b07a17;
+
+  /* Деревянная вывеска шапки — одинаковая в обеих темах. */
+  --color-sign: #3a2615;
+  --color-sign-text: #f3dfae;
+  --color-sign-muted: #c9ae7c;
+  --color-sign-gold: #e7b24f;
+
+  --shadow-page: 0 1px 2px rgba(60, 40, 20, 0.15), 0 8px 24px rgba(60, 40, 20, 0.12);
+  --shadow-note: 0 1px 1px rgba(60, 40, 20, 0.12), 0 3px 8px rgba(60, 40, 20, 0.1);
+
+  /* Зернистость бумаги — шум без картинок. */
+  --paper-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.35 0 0 0 0 0.25 0 0 0 0 0.1 0 0 0 0.09 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  --table-surface:
+    radial-gradient(ellipse at 50% 0%, rgba(255, 248, 225, 0.9), transparent 60%),
+    radial-gradient(ellipse at 50% 120%, rgba(120, 80, 30, 0.25), transparent 60%),
+    linear-gradient(#ead8ad, #e2cc9b);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --color-bg: #0d1117;
-    --color-text: #e6edf3;
-    --color-muted: #8d96a0;
-    --color-border: #30363d;
-    --color-ok: #3fb950;
-    --color-error: #f85149;
-    --color-accent: #63e2b7;
-    --color-warning: #d29922;
+    --color-bg: #17110b;
+    --color-page: #2a1e14;
+    --color-note: #35271b;
+    --color-text: #f1e3c6;
+    --color-muted: #b49d77;
+    --color-border: #6b4d2c;
+    --color-rule: #4d3820;
+    --color-ok: #8fb45a;
+    --color-error: #e0614f;
+    --color-accent: #d9a441;
+    --color-warning: #e0a33c;
+    --color-gold: #e7b24f;
+
+    --color-sign: #120c07;
+
+    --shadow-page: 0 1px 2px rgba(0, 0, 0, 0.5), 0 10px 30px rgba(0, 0, 0, 0.45);
+    --shadow-note: 0 1px 2px rgba(0, 0, 0, 0.45), 0 4px 10px rgba(0, 0, 0, 0.3);
+
+    --paper-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.9 0 0 0 0 0.7 0 0 0 0 0.4 0 0 0 0.05 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    /* Тёмные доски стола и тёплое пятно свечи сверху. */
+    --table-surface:
+      radial-gradient(ellipse at 50% -10%, rgba(255, 170, 70, 0.18), transparent 55%),
+      repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.25) 0 2px, transparent 2px 140px),
+      linear-gradient(#21170f, #160f09);
   }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background-color: var(--color-bg);
+  /* Без background-attachment: fixed — iOS Safari его не поддерживает, а на длинных
+     страницах фон «стола» обрывался на высоте экрана. */
+  background-image: var(--paper-grain), var(--table-surface);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+/* Заголовок страницы с росчерком снизу. */
+.page-title {
+  margin: 0;
+  font-size: 2rem;
+  line-height: 1.1;
+}
+
+.page-title + .page-subtitle {
+  margin: 2px 0 0;
+  color: var(--color-muted);
+  font-style: italic;
+}
+
+.flourish {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0 16px;
+  color: var(--color-border);
+}
+
+.flourish::before,
+.flourish::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--color-border), transparent);
+}
+
+/* Заголовки компонентов Naive UI — тем же книжным шрифтом, что и страницы. */
+.n-card-header__main,
+.n-dialog__title {
+  font-family: var(--font-heading);
+  font-size: 1.5rem !important;
+}
+
+.n-tabs .n-tabs-tab__label {
+  font-family: var(--font-heading);
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+a {
+  color: var(--color-accent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+/* Карточка входа и регистрации — лист пергамента. */
+.auth-card {
+  background-image: var(--paper-grain);
+  box-shadow: var(--shadow-page);
+}
+
+.auth-intro {
+  margin: -4px 0 16px;
+  color: var(--color-muted);
+  font-style: italic;
+}
+
+/* Числа ровными колонками (в Alegreya по умолчанию «старинные» цифры разной высоты). */
+.num {
+  font-variant-numeric: lining-nums tabular-nums;
 }
 
 /* Модальные формы (NModal рендерится в body, поэтому стили глобальные). */
 .form-modal {
   width: min(480px, calc(100vw - 32px));
+  background-image: var(--paper-grain);
 }
 
 .form-modal .row {
@@ -37,27 +174,9 @@
   margin: 0 0 16px;
   color: var(--color-muted);
   font-size: 0.875rem;
+  font-style: italic;
 }
 
 .form-modal .error {
   margin-bottom: 16px;
-}
-
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-  background: var(--color-bg);
-  color: var(--color-text);
-  font-family:
-    system-ui,
-    -apple-system,
-    'Segoe UI',
-    Roboto,
-    sans-serif;
-  line-height: 1.5;
 }

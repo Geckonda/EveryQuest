@@ -1,3 +1,9 @@
+// Шрифты локально, а не с Google Fonts: будут работать и офлайн в PWA.
+import '@fontsource/alegreya/400.css'
+import '@fontsource/alegreya/400-italic.css'
+import '@fontsource/alegreya/700.css'
+import '@fontsource/cormorant-garamond/600.css'
+import '@fontsource/cormorant-garamond/700.css'
 import './assets/main.css'
 
 import { createApp } from 'vue'

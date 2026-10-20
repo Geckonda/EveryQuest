@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { NAlert, NSpin, NTabPane, NTabs, NTag } from 'naive-ui'
+import { NAlert, NSpin, NTabPane, NTabs } from 'naive-ui'
 import type { Category, Tier } from '@/api/types'
 import { errorMessage } from '@/api/errors'
 import { useCatalogStore } from '@/stores/catalog'
 import { useArchiveToggle } from '@/composables/useArchiveToggle'
 import CatalogSection from '@/components/CatalogSection.vue'
+import CoinIcon from '@/components/CoinIcon.vue'
+import TierSeal from '@/components/TierSeal.vue'
 import TierFormModal from '@/components/TierFormModal.vue'
 import CategoryFormModal from '@/components/CategoryFormModal.vue'
 
@@ -42,7 +44,9 @@ function openCategory(category: Category | null) {
 </script>
 
 <template>
-  <h1>Настройки</h1>
+  <h1 class="page-title">Настройки</h1>
+  <p class="page-subtitle">Устав гильдии: тиры квестов и их награды, категории дел</p>
+  <div class="flourish">✦</div>
   <NAlert v-if="loadError" type="error">{{ loadError }}</NAlert>
   <NSpin v-else :show="loading">
     <NTabs type="line" animated>
@@ -60,11 +64,9 @@ function openCategory(category: Category | null) {
         >
           <template #item="{ item: tier }">
             <div class="line">
-              <NTag :color="{ color: tier.color ?? undefined, textColor: '#fff' }" size="small">
-                {{ tier.name }}
-              </NTag>
-              <span class="reward">+{{ tier.default_reward }}</span>
-              <span class="penalty">−{{ tier.default_penalty }}</span>
+              <TierSeal :tier="tier" />
+              <span class="reward num"><CoinIcon :size="14" /> +{{ tier.default_reward }}</span>
+              <span class="penalty num">штраф {{ tier.default_penalty }}</span>
             </div>
           </template>
         </CatalogSection>
@@ -103,30 +105,31 @@ function openCategory(category: Category | null) {
 </template>
 
 <style scoped>
-h1 {
-  margin: 0 0 12px;
-  font-size: 1.5rem;
-}
-
 .line {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   min-width: 0;
 }
 
 .text {
   min-width: 0;
+  font-family: var(--font-heading);
+  font-size: 1.15rem;
+  font-weight: 700;
 }
 
 .reward {
-  color: var(--color-ok);
-  font-variant-numeric: tabular-nums;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--color-gold);
+  font-weight: 700;
 }
 
 .penalty {
   color: var(--color-error);
-  font-variant-numeric: tabular-nums;
+  font-size: 0.875rem;
 }
 
 .dot {
@@ -138,7 +141,10 @@ h1 {
 
 .muted {
   color: var(--color-muted);
+  font-family: var(--font-body);
   font-size: 0.875rem;
+  font-style: italic;
+  font-weight: 400;
   overflow-wrap: anywhere;
 }
 </style>

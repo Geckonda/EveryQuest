@@ -9,9 +9,9 @@ export function plural(n: number, one: string, few: string, many: string): strin
   return many
 }
 
-/** «1 монета», «2 монеты», «5 монет». */
+/** «1 золотой», «2 золотых», «5 золотых». */
 export function coins(n: number): string {
-  return `${n} ${plural(n, 'монета', 'монеты', 'монет')}`
+  return `${n} ${plural(n, 'золотой', 'золотых', 'золотых')}`
 }
 
 /** Сумма со знаком: «+50», «−30» (типографский минус). */

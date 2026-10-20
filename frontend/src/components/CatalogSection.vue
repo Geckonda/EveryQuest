@@ -90,8 +90,8 @@ const visible = computed(() =>
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--color-border);
+  padding: 12px 0;
+  border-bottom: 1px dashed var(--color-rule);
 }
 
 .list li.archived .content {

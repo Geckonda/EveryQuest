@@ -8,6 +8,7 @@ import { useCatalogStore } from '@/stores/catalog'
 import { useArchiveToggle } from '@/composables/useArchiveToggle'
 import { coins } from '@/utils/format'
 import CatalogSection from '@/components/CatalogSection.vue'
+import CoinIcon from '@/components/CoinIcon.vue'
 import RewardFormModal from '@/components/RewardFormModal.vue'
 
 const auth = useAuthStore()
@@ -40,15 +41,15 @@ function open(reward: Reward | null) {
 
 function buy(reward: Reward) {
   dialog.info({
-    title: 'Купить?',
-    content: `«${reward.name}» за ${coins(reward.price)}. Останется ${coins(balance.value - reward.price)}.`,
-    positiveText: 'Купить',
+    title: 'Заказать?',
+    content: `«${reward.name}» за ${coins(reward.price)}. В кошеле останется ${coins(balance.value - reward.price)}.`,
+    positiveText: 'Заказать',
     negativeText: 'Отмена',
     onPositiveClick: async () => {
       buyingId.value = reward.id
       try {
         await catalog.purchase(reward.id)
-        message.success(`Куплено: «${reward.name}». Приятного отдыха!`)
+        message.success(`«${reward.name}» — ваше. Славного отдыха, путник!`)
       } catch (e) {
         message.error(errorMessage(e))
         await auth.fetchMe().catch(() => {})
@@ -61,14 +62,15 @@ function buy(reward: Reward) {
 </script>
 
 <template>
-  <h1>Траты</h1>
-  <p class="intro">Развлечения, которые оплачиваются монетами за квесты.</p>
+  <h1 class="page-title">Таверна</h1>
+  <p class="page-subtitle">Отдых и развлечения за честно заработанное золото</p>
+  <div class="flourish">✦</div>
   <NAlert v-if="loadError" type="error">{{ loadError }}</NAlert>
   <NSpin v-else :show="loading">
     <CatalogSection
       :items="catalog.rewards"
-      add-label="Добавить трату"
-      empty-text="Трат пока нет — добавьте то, ради чего стоит выполнять квесты"
+      add-label="Добавить в меню"
+      empty-text="Меню пустует. Впишите то, ради чего стоит браться за квесты"
       @add="open(null)"
       @edit="open"
       @toggle-archive="
@@ -77,17 +79,17 @@ function buy(reward: Reward) {
       "
     >
       <template #item="{ item: reward }">
+        <!-- Строка меню: название ········ цена -->
         <div class="line">
-          <div class="text">
-            <div>{{ reward.name }}</div>
-            <div v-if="reward.description" class="muted">{{ reward.description }}</div>
-          </div>
-          <div class="meta">
-            <span class="price">{{ coins(reward.price) }}</span>
-            <span v-if="reward.duration_minutes" class="muted"
-              >{{ reward.duration_minutes }} мин</span
-            >
-          </div>
+          <span class="name">{{ reward.name }}</span>
+          <span class="leader" aria-hidden="true" />
+          <span class="price num"><CoinIcon :size="15" /> {{ reward.price }}</span>
+        </div>
+        <div v-if="reward.description || reward.duration_minutes" class="muted">
+          {{ reward.description }}
+          <span v-if="reward.duration_minutes">
+            {{ reward.description ? '·' : '' }} {{ reward.duration_minutes }} мин
+          </span>
         </div>
       </template>
       <template #actions="{ item: reward }">
@@ -100,7 +102,7 @@ function buy(reward: Reward) {
           :loading="buyingId === reward.id"
           @click="buy(reward)"
         >
-          Купить
+          Заказать
         </NButton>
       </template>
     </CatalogSection>
@@ -110,43 +112,40 @@ function buy(reward: Reward) {
 </template>
 
 <style scoped>
-h1 {
-  margin: 0;
-  font-size: 1.5rem;
-}
-
-.intro {
-  margin: 4px 0 16px;
-  color: var(--color-muted);
-}
-
 .line {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  align-items: baseline;
+  gap: 6px;
 }
 
-.text {
-  min-width: 0;
+.name {
+  font-family: var(--font-heading);
+  font-size: 1.25rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
 }
 
-.meta {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  flex: none;
+/* Точки от названия до цены, как в меню. */
+.leader {
+  flex: 1;
+  min-width: 16px;
+  border-bottom: 2px dotted var(--color-border);
+  transform: translateY(-4px);
 }
 
 .price {
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--color-gold);
+  font-weight: 700;
   white-space: nowrap;
 }
 
 .muted {
   color: var(--color-muted);
   font-size: 0.875rem;
+  font-style: italic;
   overflow-wrap: anywhere;
 }
 </style>

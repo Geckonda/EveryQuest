@@ -55,7 +55,8 @@ async function submit() {
 
 <template>
   <div class="auth-page">
-    <NCard title="Регистрация">
+    <NCard class="auth-card" title="Вступить в гильдию">
+      <p class="auth-intro">Впишите имя в книгу гильдии — и доска квестов откроется для вас.</p>
       <NForm @submit.prevent="submit">
         <NFormItem label="Email">
           <NInput
@@ -64,7 +65,7 @@ async function submit() {
             placeholder="you@example.com"
           />
         </NFormItem>
-        <NFormItem label="Имя">
+        <NFormItem label="Имя в гильдии">
           <NInput
             v-model:value="username"
             :maxlength="64"
@@ -98,10 +99,10 @@ async function submit() {
         <p class="hint">Часовой пояс: {{ timezone }}</p>
         <NAlert v-if="error" type="error" class="error">{{ error }}</NAlert>
         <NButton type="primary" attr-type="submit" block :loading="loading" :disabled="!canSubmit">
-          Создать аккаунт
+          Вступить
         </NButton>
       </NForm>
-      <p class="switch">Уже есть аккаунт? <RouterLink to="/login">Войти</RouterLink></p>
+      <p class="switch">Уже в гильдии? <RouterLink to="/login">Войти</RouterLink></p>
     </NCard>
   </div>
 </template>

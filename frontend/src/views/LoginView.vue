@@ -31,7 +31,8 @@ async function submit() {
 
 <template>
   <div class="auth-page">
-    <NCard title="Вход">
+    <NCard class="auth-card" title="Вход в таверну">
+      <p class="auth-intro">Скрипит дверь, пахнет элем и свежим хлебом. Назовитесь, путник.</p>
       <NForm @submit.prevent="submit">
         <NFormItem label="Email">
           <NInput
@@ -59,7 +60,9 @@ async function submit() {
           Войти
         </NButton>
       </NForm>
-      <p class="switch">Нет аккаунта? <RouterLink to="/register">Зарегистрироваться</RouterLink></p>
+      <p class="switch">
+        Впервые здесь? <RouterLink to="/register">Вступить в гильдию</RouterLink>
+      </p>
     </NCard>
   </div>
 </template>
