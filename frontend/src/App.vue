@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { RouterView, useRouter } from 'vue-router'
+import { RouterLink, RouterView, useRouter } from 'vue-router'
 import {
   NButton,
   NConfigProvider,
+  NDialogProvider,
   NMessageProvider,
   darkTheme,
   dateRuRU,
@@ -17,6 +18,12 @@ const router = useRouter()
 const osTheme = useOsTheme()
 const theme = computed(() => (osTheme.value === 'dark' ? darkTheme : null))
 
+const navItems = [
+  { to: '/', label: 'Квесты' },
+  { to: '/rewards', label: 'Траты' },
+  { to: '/settings', label: 'Настройки' },
+]
+
 function logout() {
   auth.logout()
   router.push({ name: 'login' })
@@ -26,19 +33,26 @@ function logout() {
 <template>
   <NConfigProvider :theme="theme" :locale="ruRU" :date-locale="dateRuRU">
     <NMessageProvider>
-      <header class="app-header">
-        <span class="logo">Ежеквестик</span>
-        <div v-if="auth.user" class="account">
-          <span class="balance" :class="{ negative: auth.user.balance < 0 }">
-            {{ auth.user.balance }} монет
-          </span>
-          <span class="username">{{ auth.user.username }}</span>
-          <NButton size="small" quaternary @click="logout">Выйти</NButton>
-        </div>
-      </header>
-      <main>
-        <RouterView />
-      </main>
+      <NDialogProvider>
+        <header class="app-header">
+          <span class="logo">Ежеквестик</span>
+          <div v-if="auth.user" class="account">
+            <span class="balance" :class="{ negative: auth.user.balance < 0 }">
+              {{ auth.user.balance }} монет
+            </span>
+            <span class="username">{{ auth.user.username }}</span>
+            <NButton size="small" quaternary @click="logout">Выйти</NButton>
+          </div>
+        </header>
+        <nav v-if="auth.user" class="app-nav">
+          <RouterLink v-for="item in navItems" :key="item.to" :to="item.to">
+            {{ item.label }}
+          </RouterLink>
+        </nav>
+        <main>
+          <RouterView />
+        </main>
+      </NDialogProvider>
     </NMessageProvider>
   </NConfigProvider>
 </template>
@@ -80,6 +94,27 @@ function logout() {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.app-nav {
+  display: flex;
+  gap: 4px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--color-border);
+  overflow-x: auto;
+}
+
+.app-nav a {
+  padding: 10px 12px;
+  color: var(--color-muted);
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+}
+
+.app-nav a.router-link-exact-active {
+  color: var(--color-text);
+  border-bottom-color: var(--color-accent);
 }
 
 @media (max-width: 480px) {

@@ -9,11 +9,16 @@ export class ApiError extends Error {
   }
 }
 
-/** FastAPI отдаёт detail строкой (HTTPException) или списком ошибок валидации (422). */
+/**
+ * FastAPI отдаёт detail строкой (HTTPException), списком ошибок валидации (422)
+ * или объектом с полем message (например, 409 при архивации).
+ */
 function extractMessage(status: number, body: unknown): string {
   const detail = (body as { detail?: unknown } | null)?.detail
   if (typeof detail === 'string') return detail
   if (Array.isArray(detail) && typeof detail[0]?.msg === 'string') return detail[0].msg
+  const message = (detail as { message?: unknown } | null)?.message
+  if (typeof message === 'string') return message
   return `Ошибка сервера (${status})`
 }
 

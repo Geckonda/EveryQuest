@@ -5,6 +5,7 @@
   --color-border: #d0d7de;
   --color-ok: #1a7f37;
   --color-error: #cf222e;
+  --color-accent: #18a058;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -15,7 +16,29 @@
     --color-border: #30363d;
     --color-ok: #3fb950;
     --color-error: #f85149;
+    --color-accent: #63e2b7;
   }
+}
+
+/* Модальные формы (NModal рендерится в body, поэтому стили глобальные). */
+.form-modal {
+  width: min(480px, calc(100vw - 32px));
+}
+
+.form-modal .row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.form-modal .hint {
+  margin: 0 0 16px;
+  color: var(--color-muted);
+  font-size: 0.875rem;
+}
+
+.form-modal .error {
+  margin-bottom: 16px;
 }
 
 *,

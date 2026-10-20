@@ -18,6 +18,16 @@ const router = createRouter({
       component: HomeView,
     },
     {
+      path: '/rewards',
+      name: 'rewards',
+      component: () => import('../views/RewardsView.vue'),
+    },
+    {
+      path: '/settings',
+      name: 'settings',
+      component: () => import('../views/SettingsView.vue'),
+    },
+    {
       path: '/login',
       name: 'login',
       component: () => import('../views/LoginView.vue'),

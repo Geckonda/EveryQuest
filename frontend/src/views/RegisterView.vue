@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { NAlert, NButton, NCard, NForm, NFormItem, NInput } from 'naive-ui'
 import { useAuthStore } from '@/stores/auth'
-import { ApiError } from '@/api/client'
+import { errorMessage } from '@/api/errors'
 
 const MIN_PASSWORD = 8
 
@@ -46,7 +46,7 @@ async function submit() {
     })
     await router.replace('/')
   } catch (e) {
-    error.value = e instanceof ApiError ? e.message : 'Не удалось связаться с сервером'
+    error.value = errorMessage(e)
   } finally {
     loading.value = false
   }
