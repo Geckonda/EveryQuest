@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api import auth, categories, health, me, rewards, tiers
+from app.api import auth, categories, health, me, quests, rewards, tiers
 
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(health.router)
@@ -9,3 +9,4 @@ api_router.include_router(me.router)
 api_router.include_router(tiers.router)
 api_router.include_router(categories.router)
 api_router.include_router(rewards.router)
+api_router.include_router(quests.router)

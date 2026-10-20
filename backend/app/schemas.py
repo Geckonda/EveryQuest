@@ -1,8 +1,16 @@
-from datetime import datetime
-from typing import Annotated, Any, ClassVar, Self
+from datetime import date, datetime
+from typing import Annotated, Any, ClassVar, Literal, Self
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, EmailStr, Field, model_validator
+from pydantic import (
+    AfterValidator,
+    AwareDatetime,
+    BaseModel,
+    ConfigDict,
+    EmailStr,
+    Field,
+    model_validator,
+)
 
 
 def _check_timezone(value: str) -> str:
@@ -179,6 +187,58 @@ class RewardUpdate(PatchModel):
     price: Coins | None = None
     duration_minutes: DurationMinutes | None = None
     is_archived: bool | None = None
+
+
+# --- квесты ---
+
+QuestStatus = Literal["active", "completed", "failed", "archived"]
+
+
+class QuestOut(ORMModel):
+    id: int
+    name: str
+    description: str | None
+    tier_id: int
+    category_id: int | None
+    recurring_quest_id: int | None
+    period_date: date | None
+    reward: int
+    penalty: int
+    status: QuestStatus
+    created_at: datetime
+    due_at: datetime | None
+    completed_at: datetime | None
+    penalty_applied: bool
+
+
+class QuestCreate(BaseModel):
+    name: LongName
+    description: Description | None = None
+    tier_id: int
+    category_id: int | None = None
+    # Не переданы — копируются из тира.
+    reward: Coins | None = None
+    penalty: Coins | None = None
+    due_at: AwareDatetime | None = None
+
+
+class QuestUpdate(PatchModel):
+    nullable_fields = frozenset({"description", "category_id", "due_at"})
+
+    name: LongName | None = None
+    description: Description | None = None
+    tier_id: int | None = None
+    category_id: int | None = None
+    reward: Coins | None = None
+    penalty: Coins | None = None
+    due_at: AwareDatetime | None = None
+    # Убрать квест без штрафа. Вернуть из архива нельзя.
+    status: Literal["archived"] | None = None
+
+
+class QuestCompleted(BaseModel):
+    quest: QuestOut
+    balance: int
 
 
 # --- ошибки ---

@@ -1,0 +1,137 @@
+from datetime import datetime
+from typing import Annotated
+
+from fastapi import APIRouter, HTTPException, Query, status
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.crud import apply_changes, get_owned
+from app.db import DbSession
+from app.deps import CurrentUser
+from app.economy import lock_user, record_transaction, utcnow
+from app.models import Category, Quest, Tier, User
+from app.schemas import QuestCompleted, QuestCreate, QuestOut, QuestStatus, QuestUpdate
+
+router = APIRouter(prefix="/quests", tags=["quests"])
+
+
+def _check_refs(db: Session, user: User, tier_id: int, category_id: int | None) -> Tier:
+    """Тир и категория должны быть свои и не в архиве."""
+    tier = db.get(Tier, tier_id)
+    if tier is None or tier.user_id != user.id or tier.is_archived:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Тир не найден или в архиве")
+    if category_id is not None:
+        category = db.get(Category, category_id)
+        if category is None or category.user_id != user.id or category.is_archived:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_ENTITY, "Категория не найдена или в архиве"
+            )
+    return tier
+
+
+def _check_due_at(due_at: datetime | None) -> None:
+    if due_at is not None and due_at <= utcnow():
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Срок уже прошёл")
+
+
+def _ensure_active(quest: Quest) -> None:
+    """Менять и выполнять можно только активный квест, срок которого не истёк.
+
+    Просроченный, но ещё не обработанный планировщиком квест уже считается проваленным.
+    """
+    if quest.status != "active":
+        raise HTTPException(status.HTTP_409_CONFLICT, "Квест уже не активен")
+    if quest.due_at is not None and quest.due_at <= utcnow():
+        raise HTTPException(status.HTTP_409_CONFLICT, "Срок квеста истёк")
+
+
+@router.get("")
+def list_quests(
+    user: CurrentUser,
+    db: DbSession,
+    status_: Annotated[QuestStatus | None, Query(alias="status")] = None,
+    category_id: int | None = None,
+    tier_id: int | None = None,
+    limit: Annotated[int, Query(ge=1, le=500)] = 100,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> list[QuestOut]:
+    query = select(Quest).where(Quest.user_id == user.id)
+    if status_ is not None:
+        query = query.where(Quest.status == status_)
+    if category_id is not None:
+        query = query.where(Quest.category_id == category_id)
+    if tier_id is not None:
+        query = query.where(Quest.tier_id == tier_id)
+    if status_ == "active":
+        # Сначала горящие; без срока — в конце.
+        query = query.order_by(Quest.due_at.asc().nulls_last(), Quest.id)
+    else:
+        query = query.order_by(Quest.id.desc())
+    quests = db.scalars(query.limit(limit).offset(offset))
+    return [QuestOut.model_validate(quest) for quest in quests]
+
+
+@router.post("", status_code=status.HTTP_201_CREATED)
+def create_quest(data: QuestCreate, user: CurrentUser, db: DbSession) -> QuestOut:
+    tier = _check_refs(db, user, data.tier_id, data.category_id)
+    _check_due_at(data.due_at)
+    quest = Quest(
+        user_id=user.id,
+        tier_id=tier.id,
+        category_id=data.category_id,
+        name=data.name,
+        description=data.description,
+        reward=tier.default_reward if data.reward is None else data.reward,
+        penalty=tier.default_penalty if data.penalty is None else data.penalty,
+        due_at=data.due_at,
+        status="active",
+    )
+    db.add(quest)
+    db.commit()
+    return QuestOut.model_validate(quest)
+
+
+@router.patch("/{quest_id}")
+def update_quest(quest_id: int, data: QuestUpdate, user: CurrentUser, db: DbSession) -> QuestOut:
+    quest = get_owned(db, Quest, quest_id, user)
+    _ensure_active(quest)
+    changes = data.changes()
+
+    if "tier_id" in changes or "category_id" in changes:
+        tier = _check_refs(
+            db,
+            user,
+            changes.get("tier_id", quest.tier_id),
+            changes.get("category_id", quest.category_id),
+        )
+        if tier.id != quest.tier_id:
+            # Сменили тир и не задали награду явно — берём значения нового тира.
+            changes.setdefault("reward", tier.default_reward)
+            changes.setdefault("penalty", tier.default_penalty)
+    if "due_at" in changes:
+        _check_due_at(changes["due_at"])
+
+    apply_changes(quest, changes)
+    db.commit()
+    return QuestOut.model_validate(quest)
+
+
+@router.post("/{quest_id}/complete")
+def complete_quest(quest_id: int, user: CurrentUser, db: DbSession) -> QuestCompleted:
+    locked_user = lock_user(db, user.id)
+    # Квест тоже блокируется: иначе два параллельных запроса начислили бы награду дважды.
+    quest = db.execute(
+        select(Quest)
+        .where(Quest.id == quest_id, Quest.user_id == user.id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    ).scalar_one_or_none()
+    if quest is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Не найдено")
+    _ensure_active(quest)
+
+    quest.status = "completed"
+    quest.completed_at = utcnow()
+    record_transaction(db, locked_user, quest.reward, "quest_reward", quest_id=quest.id)
+    db.commit()
+    return QuestCompleted(quest=QuestOut.model_validate(quest), balance=locked_user.balance)
