@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, time
 from typing import Annotated, Any, ClassVar, Literal, Self
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -239,6 +239,99 @@ class QuestUpdate(PatchModel):
 class QuestCompleted(BaseModel):
     quest: QuestOut
     balance: int
+
+
+# --- повторяющиеся квесты ---
+
+Frequency = Literal["daily", "weekly", "monthly"]
+Interval = Annotated[int, Field(ge=1, le=365)]
+DayOfMonth = Annotated[int, Field(ge=1, le=31)]
+DaysOfWeek = list[Annotated[int, Field(ge=1, le=7)]]
+
+
+def check_schedule(
+    frequency: str,
+    days_of_week: list[int] | None,
+    day_of_month: int | None,
+    start_date: date | None,
+    end_date: date | None,
+) -> list[int] | None:
+    """Проверяет согласованность расписания; возвращает нормализованные дни недели."""
+    if frequency != "weekly" and days_of_week:
+        raise ValueError("Дни недели задаются только для еженедельных квестов")
+    if frequency != "monthly" and day_of_month is not None:
+        raise ValueError("Число месяца задаётся только для ежемесячных квестов")
+    if start_date and end_date and end_date < start_date:
+        raise ValueError("Дата окончания раньше даты начала")
+    return sorted(set(days_of_week)) if days_of_week else None
+
+
+class RecurringQuestOut(ORMModel):
+    id: int
+    name: str
+    description: str | None
+    tier_id: int
+    category_id: int | None
+    reward: int
+    penalty: int
+    frequency: Frequency
+    interval: int
+    days_of_week: list[int] | None
+    day_of_month: int | None
+    due_time: time
+    start_date: date
+    end_date: date | None
+    is_active: bool
+    is_archived: bool
+    created_at: datetime
+    # Ближайший срок будущего экземпляра; None — на паузе, в архиве или расписание закончилось.
+    next_due_at: datetime | None = None
+
+
+class RecurringQuestCreate(BaseModel):
+    name: LongName
+    description: Description | None = None
+    tier_id: int
+    category_id: int | None = None
+    reward: Coins | None = None
+    penalty: Coins | None = None
+    frequency: Frequency
+    interval: Interval = 1
+    days_of_week: DaysOfWeek | None = None
+    day_of_month: DayOfMonth | None = None
+    due_time: time = time(23, 59)
+    # Не передана — сегодня по времени пользователя.
+    start_date: date | None = None
+    end_date: date | None = None
+
+    @model_validator(mode="after")
+    def _schedule(self) -> Self:
+        self.days_of_week = check_schedule(
+            self.frequency, self.days_of_week, self.day_of_month, self.start_date, self.end_date
+        )
+        return self
+
+
+class RecurringQuestUpdate(PatchModel):
+    nullable_fields = frozenset(
+        {"description", "category_id", "days_of_week", "day_of_month", "end_date"}
+    )
+
+    name: LongName | None = None
+    description: Description | None = None
+    tier_id: int | None = None
+    category_id: int | None = None
+    reward: Coins | None = None
+    penalty: Coins | None = None
+    frequency: Frequency | None = None
+    interval: Interval | None = None
+    days_of_week: DaysOfWeek | None = None
+    day_of_month: DayOfMonth | None = None
+    due_time: time | None = None
+    start_date: date | None = None
+    end_date: date | None = None
+    is_active: bool | None = None
+    is_archived: bool | None = None
 
 
 # --- транзакции ---

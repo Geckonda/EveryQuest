@@ -220,8 +220,8 @@ def test_scheduler_disabled_in_tests() -> None:
     assert settings.scheduler_enabled is False
 
 
-def test_scheduler_has_penalty_job() -> None:
+def test_scheduler_has_quests_job() -> None:
     scheduler = create_scheduler()
-    job = scheduler.get_job("penalties")
+    job = scheduler.get_job("quests")
     assert job is not None
     assert job.trigger.interval == timedelta(seconds=settings.scheduler_interval_seconds)

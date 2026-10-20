@@ -13,24 +13,31 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from app.config import settings
 from app.db import SessionLocal
 from app.economy import utcnow
-from app.jobs import apply_penalties
+from app.jobs import apply_penalties, generate_recurring
 
 logger = logging.getLogger(__name__)
 
 
-def run_penalties() -> None:
+def run_jobs() -> None:
+    """Сначала штрафы за прошлые периоды, затем экземпляры за текущие.
+
+    Одна задача, а не две: порядок важен и не зависит от того, какая успела раньше.
+    """
+    now = utcnow()
     with SessionLocal() as db:
-        apply_penalties(db, utcnow())
+        apply_penalties(db, now)
+    with SessionLocal() as db:
+        generate_recurring(db, now)
 
 
 def create_scheduler() -> BackgroundScheduler:
     scheduler = BackgroundScheduler(timezone=UTC)
     scheduler.add_job(
-        run_penalties,
+        run_jobs,
         "interval",
         seconds=settings.scheduler_interval_seconds,
-        id="penalties",
-        # Сразу при старте — догнать всё, что просрочилось, пока сервер был выключен.
+        id="quests",
+        # Сразу при старте — догнать всё, что накопилось, пока сервер был выключен.
         next_run_time=datetime.now(UTC),
         max_instances=1,
         coalesce=True,
