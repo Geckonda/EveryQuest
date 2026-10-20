@@ -12,5 +12,9 @@ class Settings(BaseSettings):
 
     cors_origins: list[str] = ["http://localhost:5173"]
 
+    # Фоновые задачи (штрафы, генерация повторяющихся квестов). В тестах выключено.
+    scheduler_enabled: bool = True
+    scheduler_interval_seconds: int = 300
+
 
 settings = Settings()

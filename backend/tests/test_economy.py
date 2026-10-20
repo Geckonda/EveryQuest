@@ -1,12 +1,10 @@
 import threading
-from collections.abc import Iterator
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import Engine, delete, func, select
+from sqlalchemy import Engine, func, select
 from sqlalchemy.orm import Session
 
-from app.db import get_db
 from app.main import app
 from app.models import Quest, Transaction, User
 from tests.conftest import auth_headers, register
@@ -176,26 +174,6 @@ def test_balance_matches_transactions_sum(
 
 
 # --- параллельные запросы ---
-
-
-@pytest.fixture
-def committing_db(engine: Engine) -> Iterator[None]:
-    """Каждый запрос — своя сессия с настоящим commit, как в проде.
-
-    Нужен, чтобы два потока действительно конкурировали за блокировку строки.
-    Созданных пользователей удаляем в конце (каскад чистит всё остальное).
-    """
-
-    def get_real_db() -> Iterator[Session]:
-        with Session(engine, expire_on_commit=False) as session:
-            yield session
-
-    app.dependency_overrides[get_db] = get_real_db
-    yield
-    app.dependency_overrides.clear()
-    with Session(engine) as session:
-        session.execute(delete(User).where(User.email.like("race-%")))
-        session.commit()
 
 
 def run_concurrently(n: int, request) -> list[int]:
