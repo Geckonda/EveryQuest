@@ -165,4 +165,6 @@ class Transaction(Base):
     quest_id: Mapped[int | None] = mapped_column(ForeignKey("quests.id"))
     reward_id: Mapped[int | None] = mapped_column(ForeignKey("rewards.id"))
     balance_after: Mapped[int] = mapped_column(Integer, nullable=False)
+    # Комментарий к ручной корректировке.
+    note: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = created_at_column()
