@@ -1,10 +1,11 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, status
 from sqlalchemy import select
 
+from app.crud import apply_changes, ensure_can_archive, get_owned
 from app.db import DbSession
 from app.deps import CurrentUser
 from app.models import Category
-from app.schemas import CategoryOut
+from app.schemas import ArchiveConflict, CategoryCreate, CategoryOut, CategoryUpdate
 
 router = APIRouter(prefix="/categories", tags=["categories"])
 
@@ -17,3 +18,24 @@ def list_categories(
     if not include_archived:
         query = query.where(Category.is_archived.is_(False))
     return [CategoryOut.model_validate(category) for category in db.scalars(query)]
+
+
+@router.post("", status_code=status.HTTP_201_CREATED)
+def create_category(data: CategoryCreate, user: CurrentUser, db: DbSession) -> CategoryOut:
+    category = Category(user_id=user.id, **data.model_dump())
+    db.add(category)
+    db.commit()
+    return CategoryOut.model_validate(category)
+
+
+@router.patch("/{category_id}", responses={409: {"model": ArchiveConflict}})
+def update_category(
+    category_id: int, data: CategoryUpdate, user: CurrentUser, db: DbSession
+) -> CategoryOut:
+    category = get_owned(db, Category, category_id, user)
+    changes = data.changes()
+    if changes.get("is_archived") and not category.is_archived:
+        ensure_can_archive(db, "category_id", category.id)
+    apply_changes(category, changes)
+    db.commit()
+    return CategoryOut.model_validate(category)

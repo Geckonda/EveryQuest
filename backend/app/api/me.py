@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 
+from app.crud import apply_changes
 from app.db import DbSession
 from app.deps import CurrentUser
 from app.schemas import UserOut, UserUpdate
@@ -14,7 +15,6 @@ def get_me(user: CurrentUser) -> UserOut:
 
 @router.patch("")
 def update_me(data: UserUpdate, user: CurrentUser, db: DbSession) -> UserOut:
-    for field, value in data.model_dump(exclude_unset=True, exclude_none=True).items():
-        setattr(user, field, value)
+    apply_changes(user, data.changes())
     db.commit()
     return UserOut.model_validate(user)
