@@ -5,11 +5,14 @@ import type { Quest } from '@/api/types'
 import { errorMessage } from '@/api/errors'
 import { useCatalogStore } from '@/stores/catalog'
 import { useQuestsStore } from '@/stores/quests'
+import { useRecurringStore } from '@/stores/recurring'
 import QuestCard from '@/components/QuestCard.vue'
+import RecurringList from '@/components/RecurringList.vue'
 import QuestFormModal from '@/components/QuestFormModal.vue'
 
 const catalog = useCatalogStore()
 const quests = useQuestsStore()
+const recurring = useRecurringStore()
 const message = useMessage()
 const dialog = useDialog()
 
@@ -17,6 +20,7 @@ const loading = ref(true)
 const loadError = ref<string | null>(null)
 const historyLoaded = ref(false)
 const historyLoading = ref(false)
+const recurringLoading = ref(false)
 const busyId = ref<number | null>(null)
 
 const modal = ref(false)
@@ -40,6 +44,18 @@ onMounted(async () => {
 onUnmounted(() => clearInterval(timer))
 
 async function onTabChange(tab: string) {
+  if (tab === 'recurring') {
+    // Шаблоны перечитываем при каждом открытии: next_due_at зависит от текущего времени.
+    recurringLoading.value = true
+    try {
+      await recurring.load()
+    } catch (e) {
+      message.error(errorMessage(e))
+    } finally {
+      recurringLoading.value = false
+    }
+    return
+  }
   if (tab !== 'history' || historyLoaded.value) return
   historyLoading.value = true
   try {
@@ -135,6 +151,11 @@ const categoryOf = (quest: Quest) => catalog.categories.find((c) => c.id === que
             :category="categoryOf(quest)"
             :now="now"
           />
+        </NSpin>
+      </NTabPane>
+      <NTabPane name="recurring" tab="Повторяющиеся">
+        <NSpin :show="recurringLoading">
+          <RecurringList />
         </NSpin>
       </NTabPane>
     </NTabs>

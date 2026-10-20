@@ -29,7 +29,10 @@ const STATUS_TYPE = { completed: 'success', failed: 'error', archived: 'default'
 <template>
   <article class="quest" :class="{ overdue: due?.overdue }">
     <div class="head">
-      <h3 class="name">{{ quest.name }}</h3>
+      <h3 class="name">
+        <span v-if="quest.recurring_quest_id" class="recurring" title="Повторяющийся квест">↻</span>
+        {{ quest.name }}
+      </h3>
       <NTag
         v-if="tier"
         :color="{ color: tier.color ?? undefined, textColor: '#fff' }"
@@ -103,6 +106,11 @@ const STATUS_TYPE = { completed: 'success', failed: 'error', archived: 'default'
   font-size: 1rem;
   font-weight: 600;
   overflow-wrap: anywhere;
+}
+
+.recurring {
+  color: var(--color-muted);
+  font-weight: 400;
 }
 
 .description {
