@@ -1,0 +1,85 @@
+# Refactor.md — журнал разработки
+
+Что сделано, на какие грабли наступили и что стоит улучшить. Читать перед началом работы, дописывать после каждого этапа. Выполненные улучшения не удалять, а отмечать `[x]` с пометкой, когда сделано.
+
+---
+
+## История
+
+### Этап 1. Каркас — 2026-10-17
+
+- Монорепо: `backend/` (FastAPI, SQLAlchemy 2.0 синхронно + psycopg 3, Alembic, ruff, pytest) и `frontend/` (create-vue: Vue 3, TS, Pinia, Router, Vitest, oxlint + eslint + prettier).
+- `docker-compose.yml`: Postgres 17, бэкенд с `--reload`, фронт на Vite dev-сервере. Код смонтирован в контейнеры, миграции применяются при старте бэкенда.
+- Все 7 таблиц из плана в `app/models.py`, первая миграция `0001_initial_schema` — автогенерация, проверена upgrade → downgrade → upgrade и `alembic check`.
+- CHECK-ограничения вместо PG enum (status, type, frequency) — их проще менять миграциями.
+- Отступление от плана: добавлено `recurring_quests.is_archived` — в API заявлена архивация шаблонов, а `is_active` — это пауза.
+- Naming convention для ограничений в `app/db.py`, чтобы Alembic мог их потом переименовывать/удалять.
+
+### Этап 2. Аккаунты — 2026-10-18
+
+- Бэкенд:
+  - `app/security.py` — argon2 для паролей, JWT HS256 с claim `type` (access/refresh), чтобы один нельзя было подсунуть вместо другого.
+  - `app/api/auth.py` — `register` (сразу выдаёт пару токенов), `login`, `refresh` (только новый access). Email нормализуется в нижний регистр, поиск — по `lower(email)`.
+  - При регистрации копируются шаблоны из `app/defaults.py`: тиры I–V (10/5, 25/10, 50/25, 100/50, 200/100) и 6 категорий.
+  - `GET/PATCH /me`, `GET /tiers`, `GET /categories` (только чтение; CRUD — этап 3). Параметр `include_archived`.
+  - `app/deps.py` — `CurrentUser`; `app/db.py` — `DbSession` через `Annotated`.
+  - Часовой пояс валидируется через `zoneinfo`; в образ добавлен пакет `tzdata`, чтобы не зависеть от системной базы поясов.
+  - Тесты: отдельная БД `<имя>_test`, схема из `metadata.create_all`, каждый тест в откатываемой транзакции (`join_transaction_mode="create_savepoint"`). 12 тестов.
+- Фронтенд:
+  - UI-библиотека — Naive UI (`NConfigProvider` с тёмной темой по системе, русская локаль).
+  - `api/client.ts` — обёртка над fetch: Bearer-токен, при 401 один раз пробует refresh и повторяет запрос, иначе разлогинивает. Текст ошибки берётся из `detail` FastAPI.
+  - `stores/auth.ts` — токены в localStorage (обёрнуто в try/catch), параллельные refresh схлопываются в один запрос.
+  - Router guard: `meta.guestOnly` для входа/регистрации, остальные маршруты требуют вход; профиль догружается в guard.
+  - Страницы входа и регистрации, главная показывает тиры и категории, в шапке баланс и имя.
+  - Часовой пояс при регистрации берётся из браузера (`Intl`).
+  - Тесты: клиент (refresh и повтор, логаут, ошибки 422) и стор. 8 тестов.
+
+---
+
+## Ошибки и грабли
+
+| Когда | Что случилось | Как решили |
+| --- | --- | --- |
+| Этап 1 | `npm install` (npm 10.9) падает: `Cannot read properties of null (reading 'edgesOut')` — баг arborist на peer-зависимостях jsdom → canvas | `npx npm@11 install`. В Docker `npm ci` по lock-файлу работает и на npm 10 |
+| Этап 1 | Порт 5173 занят контейнером другого проекта (`er_frontend`) | Порты вынесены в `.env` (`FRONTEND_PORT` и др.), фронт по умолчанию на 5175 |
+| Этап 1 | Docker Desktop не запущен → `open //./pipe/dockerDesktopLinuxEngine` | Запустить Docker Desktop. Повторилось на этапе 2 после перезагрузки |
+| Этап 1 | `alembic revision` падает: нет папки `alembic/versions` | Добавлен `.gitkeep` |
+| Этап 1 | Конвенция `uq_%(table)s_%(column_0_name)s` дала составному UNIQUE имя только по первой колонке | Заменено на `column_0_N_name` |
+| Этап 1 | ruff B008 на `Depends(...)` в аргументах по умолчанию | Перешли на `Annotated[..., Depends()]` (`DbSession`, `CurrentUser`) |
+| Этап 1 | pytest в контейнере не находил пакет `app` | `pythonpath = ["."]` в `pyproject.toml` |
+| Этап 2 | После добавления npm-пакета контейнер фронта не видит его: `node_modules` лежит в анонимном томе со старым содержимым | `docker compose up -d --build --renew-anon-volumes frontend` (записано в README) |
+| Этап 2 | oxlint (`vitest/require-mock-type-parameters`) требует типизировать `vi.fn` | `vi.fn<typeof fetch>()` и т.п. |
+| Коммиты | В PowerShell 5.1 `git add "Ежеквестик — план MVP.md"` не находит файл: кириллица и «—» искажаются при передаче аргументов в git | Добавлять по маске без кириллицы: `git add -- '*MVP.md'`. Возможно, переименовать план в латиницу |
+
+---
+
+## Возможные улучшения
+
+Безопасность и авторизация:
+
+- [ ] **Refresh-токен в httpOnly cookie** вместо localStorage — сейчас XSS может украсть оба токена.
+- [ ] **Ротация и отзыв refresh-токенов.** Сейчас refresh — stateless JWT на 30 дней: «выйти со всех устройств» или отозвать украденный токен нельзя. Нужна таблица сессий (jti, user_id, expires_at, revoked).
+- [ ] **Rate limit на `/auth/login` и `/auth/register`** (например, slowapi) — защита от перебора паролей.
+- [ ] Смена пароля и сброс пароля по email.
+- [ ] `JWT_SECRET` по умолчанию `change-me` — на проде падать при старте, если секрет не задан.
+
+Бэкенд:
+
+- [ ] Запросы к `tiers` и `categories` пишутся прямо в роутерах — когда появится CRUD, вынести их в сервисный слой (`app/services/`), чтобы не дублировать фильтр по `user_id` и проверку «объект принадлежит пользователю».
+- [ ] Тесты собирают схему через `metadata.create_all`, а не через миграции — расхождение ловит только `alembic check`. Можно добавить тест, который прогоняет `alembic upgrade head` на чистой базе.
+- [ ] Предупреждение `DeprecationWarning` от starlette/anyio (`BlockingPortal`) — уйдёт с обновлением FastAPI/starlette.
+- [ ] Логи в JSON и request-id для отладки на проде.
+
+Фронтенд:
+
+- [ ] Главная — временная: показывает тиры и категории. На этапе 4 заменить списком квестов.
+- [ ] Навигация (табы/меню) появится, когда будет больше одного экрана.
+- [ ] Баланс в шапке не обновляется сам — после операций с монетами (этап 4) вызывать `auth.fetchMe()` или возвращать баланс в ответе.
+- [ ] Смена часового пояса и имени в профиле (API уже есть: `PATCH /me`).
+- [ ] Бандл главной ~336 КБ (104 КБ gzip) из-за Naive UI — проверить tree-shaking, при необходимости `unplugin-vue-components` с резолвером Naive UI.
+
+Инфраструктура:
+
+- [ ] CI (GitHub Actions): ruff + pytest с Postgres-сервисом, lint + type-check + vitest на фронте.
+- [ ] pre-commit хуки для ruff и prettier.
+- [ ] Прод-сборка фронта (nginx со статикой) и прод-образ бэкенда без dev-зависимостей — этап 6.
