@@ -1,11 +1,13 @@
-from fastapi import APIRouter, status
+from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
 
+from app.api.transactions import transaction_out
 from app.crud import apply_changes, get_owned
 from app.db import DbSession
 from app.deps import CurrentUser
+from app.economy import InsufficientFunds, purchase
 from app.models import Reward
-from app.schemas import RewardCreate, RewardOut, RewardUpdate
+from app.schemas import BalanceChange, RewardCreate, RewardOut, RewardUpdate
 
 router = APIRouter(prefix="/rewards", tags=["rewards"])
 
@@ -32,8 +34,21 @@ def create_reward(data: RewardCreate, user: CurrentUser, db: DbSession) -> Rewar
 def update_reward(
     reward_id: int, data: RewardUpdate, user: CurrentUser, db: DbSession
 ) -> RewardOut:
-    # Покупок ещё нет, поэтому архивация трат ничем не ограничена.
+    # Архивация трат ничем не ограничена: покупки ссылаются на трату, но остаются в журнале.
     reward = get_owned(db, Reward, reward_id, user)
     apply_changes(reward, data.changes())
     db.commit()
     return RewardOut.model_validate(reward)
+
+
+@router.post("/{reward_id}/purchase", responses={400: {"description": "Не хватает монет"}})
+def purchase_reward(reward_id: int, user: CurrentUser, db: DbSession) -> BalanceChange:
+    reward = get_owned(db, Reward, reward_id, user)
+    if reward.is_archived:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Трата в архиве")
+    try:
+        transaction, locked_user = purchase(db, user.id, reward)
+    except InsufficientFunds as error:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(error)) from None
+    db.commit()
+    return BalanceChange(transaction=transaction_out(db, transaction), balance=locked_user.balance)

@@ -241,6 +241,45 @@ class QuestCompleted(BaseModel):
     balance: int
 
 
+# --- транзакции ---
+
+TransactionType = Literal["quest_reward", "penalty", "purchase", "manual"]
+
+
+class TransactionOut(ORMModel):
+    id: int
+    amount: int
+    type: TransactionType
+    quest_id: int | None
+    reward_id: int | None
+    note: str | None
+    balance_after: int
+    created_at: datetime
+    # Название квеста или траты — чтобы журнал читался без лишних запросов.
+    title: str | None = None
+
+
+class TransactionPage(BaseModel):
+    items: list[TransactionOut]
+    total: int
+
+
+class BalanceChange(BaseModel):
+    transaction: TransactionOut
+    balance: int
+
+
+class ManualTransactionIn(BaseModel):
+    amount: Annotated[int, Field(ge=-1_000_000, le=1_000_000)]
+    note: Description | None = None
+
+    @model_validator(mode="after")
+    def _non_zero(self) -> Self:
+        if self.amount == 0:
+            raise ValueError("Сумма не может быть нулевой")
+        return self
+
+
 # --- ошибки ---
 
 

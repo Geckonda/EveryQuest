@@ -3,17 +3,24 @@
 Правило: каждое изменение баланса — в одной транзакции БД со сменой статуса квеста
 и записью в transactions. Строка пользователя блокируется (SELECT … FOR UPDATE) первой,
 до остальных строк, — единый порядок блокировок исключает взаимоблокировки.
+
+Функции не делают commit — это решает вызывающий код.
 """
 
 from datetime import UTC, datetime
-from typing import Literal
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Transaction, User
+from app.models import Reward, Transaction, User
+from app.schemas import TransactionType
 
-TransactionType = Literal["quest_reward", "penalty", "purchase", "manual"]
+
+class InsufficientFunds(Exception):  # noqa: N818 — доменная ошибка, не «Error»
+    def __init__(self, needed: int, balance: int) -> None:
+        super().__init__(f"Не хватает монет: нужно {needed}, на счету {balance}")
+        self.needed = needed
+        self.balance = balance
 
 
 def utcnow() -> datetime:
@@ -42,6 +49,7 @@ def record_transaction(
     *,
     quest_id: int | None = None,
     reward_id: int | None = None,
+    note: str | None = None,
 ) -> Transaction:
     """Меняет баланс и пишет транзакцию. Пользователь должен быть заблокирован lock_user."""
     locked_user.balance += amount
@@ -51,7 +59,29 @@ def record_transaction(
         type=type_,
         quest_id=quest_id,
         reward_id=reward_id,
+        note=note,
         balance_after=locked_user.balance,
     )
     db.add(transaction)
+    db.flush()
     return transaction
+
+
+def purchase(db: Session, user_id: int, reward: Reward) -> tuple[Transaction, User]:
+    """Покупка разрешена, только если хватает монет; в минусе купить ничего нельзя."""
+    user = lock_user(db, user_id)
+    if user.balance < reward.price:
+        raise InsufficientFunds(reward.price, user.balance)
+    transaction = record_transaction(db, user, -reward.price, "purchase", reward_id=reward.id)
+    return transaction, user
+
+
+def manual_adjust(
+    db: Session, user_id: int, amount: int, note: str | None
+) -> tuple[Transaction, User]:
+    """Ручная корректировка. Уйти в минус можно только от штрафов — не от списания вручную."""
+    user = lock_user(db, user_id)
+    if amount < 0 and user.balance + amount < 0:
+        raise InsufficientFunds(-amount, user.balance)
+    transaction = record_transaction(db, user, amount, "manual", note=note)
+    return transaction, user

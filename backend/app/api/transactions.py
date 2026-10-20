@@ -1,0 +1,70 @@
+from typing import Annotated
+
+from fastapi import APIRouter, HTTPException, Query, status
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session
+
+from app.db import DbSession
+from app.deps import CurrentUser
+from app.economy import InsufficientFunds, manual_adjust
+from app.models import Quest, Reward, Transaction
+from app.schemas import (
+    BalanceChange,
+    ManualTransactionIn,
+    TransactionOut,
+    TransactionPage,
+    TransactionType,
+)
+
+router = APIRouter(prefix="/transactions", tags=["transactions"])
+
+
+def transaction_out(db: Session, transaction: Transaction) -> TransactionOut:
+    """Одна транзакция с названием квеста или траты."""
+    title = None
+    if transaction.quest_id is not None:
+        title = db.scalar(select(Quest.name).where(Quest.id == transaction.quest_id))
+    elif transaction.reward_id is not None:
+        title = db.scalar(select(Reward.name).where(Reward.id == transaction.reward_id))
+    return TransactionOut.model_validate(transaction).model_copy(update={"title": title})
+
+
+@router.get("")
+def list_transactions(
+    user: CurrentUser,
+    db: DbSession,
+    type_: Annotated[TransactionType | None, Query(alias="type")] = None,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> TransactionPage:
+    condition = Transaction.user_id == user.id
+    if type_ is not None:
+        condition &= Transaction.type == type_
+
+    total = db.scalar(select(func.count()).select_from(Transaction).where(condition))
+    rows = db.execute(
+        select(Transaction, func.coalesce(Quest.name, Reward.name))
+        .outerjoin(Quest, Quest.id == Transaction.quest_id)
+        .outerjoin(Reward, Reward.id == Transaction.reward_id)
+        .where(condition)
+        .order_by(Transaction.created_at.desc(), Transaction.id.desc())
+        .limit(limit)
+        .offset(offset)
+    ).all()
+    items = [
+        TransactionOut.model_validate(transaction).model_copy(update={"title": title})
+        for transaction, title in rows
+    ]
+    return TransactionPage(items=items, total=total or 0)
+
+
+@router.post("/manual", status_code=status.HTTP_201_CREATED)
+def create_manual_transaction(
+    data: ManualTransactionIn, user: CurrentUser, db: DbSession
+) -> BalanceChange:
+    try:
+        transaction, locked_user = manual_adjust(db, user.id, data.amount, data.note)
+    except InsufficientFunds as error:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(error)) from None
+    db.commit()
+    return BalanceChange(transaction=transaction_out(db, transaction), balance=locked_user.balance)
