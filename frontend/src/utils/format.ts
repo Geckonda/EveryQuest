@@ -1,14 +1,17 @@
-/** «1 монета», «2 монеты», «5 монет». */
-export function coins(n: number): string {
+/** Русское склонение после числа: plural(2, 'день', 'дня', 'дней') → 'дня'. */
+export function plural(n: number, one: string, few: string, many: string): string {
   const abs = Math.abs(n)
   const lastTwo = abs % 100
   const last = abs % 10
-  let word = 'монет'
-  if (lastTwo < 11 || lastTwo > 14) {
-    if (last === 1) word = 'монета'
-    else if (last >= 2 && last <= 4) word = 'монеты'
-  }
-  return `${n} ${word}`
+  if (lastTwo >= 11 && lastTwo <= 14) return many
+  if (last === 1) return one
+  if (last >= 2 && last <= 4) return few
+  return many
+}
+
+/** «1 монета», «2 монеты», «5 монет». */
+export function coins(n: number): string {
+  return `${n} ${plural(n, 'монета', 'монеты', 'монет')}`
 }
 
 /** Сумма со знаком: «+50», «−30» (типографский минус). */

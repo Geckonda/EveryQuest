@@ -88,6 +88,49 @@ export interface QuestCompleted {
   balance: number
 }
 
+export type Frequency = 'daily' | 'weekly' | 'monthly'
+
+export interface RecurringQuest {
+  id: number
+  name: string
+  description: string | null
+  tier_id: number
+  category_id: number | null
+  reward: number
+  penalty: number
+  frequency: Frequency
+  interval: number
+  /** 1 — понедельник … 7 — воскресенье. */
+  days_of_week: number[] | null
+  /** 31 — последний день месяца. */
+  day_of_month: number | null
+  /** «HH:MM:SS», локальное время пользователя. */
+  due_time: string
+  start_date: string
+  end_date: string | null
+  is_active: boolean
+  is_archived: boolean
+  created_at: string
+  next_due_at: string | null
+}
+
+export type RecurringPayload = Pick<
+  RecurringQuest,
+  | 'name'
+  | 'description'
+  | 'tier_id'
+  | 'category_id'
+  | 'reward'
+  | 'penalty'
+  | 'frequency'
+  | 'interval'
+  | 'days_of_week'
+  | 'day_of_month'
+  | 'due_time'
+  | 'start_date'
+  | 'end_date'
+>
+
 export type TransactionType = 'quest_reward' | 'penalty' | 'purchase' | 'manual'
 
 export interface Transaction {
