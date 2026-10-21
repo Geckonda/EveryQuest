@@ -7,6 +7,7 @@ import { errorMessage } from '@/api/errors'
 import { formatDateTime, signed } from '@/utils/format'
 import ManualTransactionModal from '@/components/ManualTransactionModal.vue'
 import EmptyState from '@/components/EmptyState.vue'
+import AppIcon from '@/components/AppIcon.vue'
 
 const PAGE_SIZE = 50
 
@@ -59,7 +60,7 @@ onMounted(() => load(true))
     </div>
     <NButton size="small" @click="manualModal = true">Поправка</NButton>
   </div>
-  <div class="flourish">✦</div>
+  <div class="flourish"><AppIcon name="sparkle" :size="14" /></div>
 
   <NSelect
     v-model:value="filter"

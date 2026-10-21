@@ -12,6 +12,7 @@ import TierSeal from '@/components/TierSeal.vue'
 import TierFormModal from '@/components/TierFormModal.vue'
 import CategoryFormModal from '@/components/CategoryFormModal.vue'
 import ProfileSection from '@/components/ProfileSection.vue'
+import AppIcon from '@/components/AppIcon.vue'
 
 const catalog = useCatalogStore()
 const toggleArchive = useArchiveToggle()
@@ -48,7 +49,7 @@ function openCategory(category: Category | null) {
 <template>
   <h1 class="page-title">Настройки</h1>
   <p class="page-subtitle">Устав гильдии: тиры квестов и их награды, категории дел, профиль</p>
-  <div class="flourish">✦</div>
+  <div class="flourish"><AppIcon name="sparkle" :size="14" /></div>
   <NAlert v-if="loadError" type="error">{{ loadError }}</NAlert>
   <NSpin v-else :show="loading">
     <NTabs type="line" animated>

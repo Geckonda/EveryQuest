@@ -5,6 +5,7 @@ import type { Category, Quest, Tier } from '@/api/types'
 import { countdown, dueLabel, formatDateTime, tierLabel } from '@/utils/format'
 import CoinIcon from './CoinIcon.vue'
 import TierSeal from './TierSeal.vue'
+import AppIcon from './AppIcon.vue'
 
 const props = defineProps<{
   quest: Quest
@@ -53,7 +54,9 @@ const failNote = computed(() =>
 
     <div class="body">
       <h3 class="name">
-        <span v-if="quest.recurring_quest_id" class="recurring" title="Повторяющийся квест">↻</span>
+        <span v-if="quest.recurring_quest_id" class="recurring" title="Повторяющийся квест">
+          <AppIcon name="repeat" :size="18" />
+        </span>
         {{ quest.name }}
       </h3>
       <p v-if="quest.description" class="description">{{ quest.description }}</p>
@@ -73,7 +76,9 @@ const failNote = computed(() =>
       <div class="when">
         <template v-if="isActive">
           <template v-if="due">
-            <span :class="{ late: due.overdue, soon: due.soon }">⌛ {{ due.text }}</span>
+            <span class="due" :class="{ late: due.overdue, soon: due.soon }">
+              <AppIcon name="hourglass" :size="14" /> {{ due.text }}
+            </span>
             <span v-if="timer && !due.overdue" class="left num"> · осталось {{ timer.left }}</span>
           </template>
           <span v-else>без срока</span>

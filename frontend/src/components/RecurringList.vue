@@ -12,6 +12,7 @@ import CatalogSection from './CatalogSection.vue'
 import CoinIcon from './CoinIcon.vue'
 import TierSeal from './TierSeal.vue'
 import RecurringFormModal from './RecurringFormModal.vue'
+import AppIcon from './AppIcon.vue'
 
 const catalog = useCatalogStore()
 const recurring = useRecurringStore()
@@ -59,7 +60,7 @@ const tierOf = (t: RecurringQuest) => catalog.tiers.find((tier) => tier.id === t
     <template #item="{ item: t }">
       <div class="head">
         <TierSeal v-if="tierOf(t)" :tier="tierOf(t)!" :size="28" />
-        <span class="name">↻ {{ t.name }}</span>
+        <span class="name"><AppIcon name="repeat" :size="18" class="repeat" /> {{ t.name }}</span>
         <NTag v-if="!t.is_active && !t.is_archived" size="small">на паузе</NTag>
       </div>
       <div class="meta">
@@ -86,6 +87,10 @@ const tierOf = (t: RecurringQuest) => catalog.tiers.find((tier) => tier.id === t
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+}
+
+.repeat {
+  color: var(--color-muted);
 }
 
 .name {

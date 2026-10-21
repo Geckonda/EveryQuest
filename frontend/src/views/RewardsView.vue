@@ -13,6 +13,7 @@ import { flyCoins, purseElement } from '@/utils/coinFx'
 import CatalogSection from '@/components/CatalogSection.vue'
 import CoinIcon from '@/components/CoinIcon.vue'
 import RewardFormModal from '@/components/RewardFormModal.vue'
+import AppIcon from '@/components/AppIcon.vue'
 
 const auth = useAuthStore()
 const catalog = useCatalogStore()
@@ -106,7 +107,7 @@ function buy(reward: Reward, event: MouseEvent) {
 <template>
   <h1 class="page-title">Таверна</h1>
   <p class="page-subtitle">Отдых и развлечения за честно заработанное золото</p>
-  <div class="flourish">✦</div>
+  <div class="flourish"><AppIcon name="sparkle" :size="14" /></div>
   <NAlert v-if="loadError" type="error">{{ loadError }}</NAlert>
   <NSpin v-else :show="loading">
     <CatalogSection

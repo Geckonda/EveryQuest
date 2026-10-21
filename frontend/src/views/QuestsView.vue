@@ -14,6 +14,7 @@ import QuestCard from '@/components/QuestCard.vue'
 import RecurringList from '@/components/RecurringList.vue'
 import QuestFormModal from '@/components/QuestFormModal.vue'
 import QuestFilters from '@/components/QuestFilters.vue'
+import AppIcon from '@/components/AppIcon.vue'
 
 const catalog = useCatalogStore()
 const quests = useQuestsStore()
@@ -108,7 +109,7 @@ async function loadMoreHistory() {
       Повесить квест
     </NButton>
   </div>
-  <div class="flourish">✦</div>
+  <div class="flourish"><AppIcon name="sparkle" :size="14" /></div>
 
   <NAlert v-if="loadError" type="error">{{ loadError }}</NAlert>
   <NSpin v-else :show="loading">

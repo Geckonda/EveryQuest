@@ -16,6 +16,7 @@ import CoinIcon from '@/components/CoinIcon.vue'
 import QuestCard from '@/components/QuestCard.vue'
 import QuestFormModal from '@/components/QuestFormModal.vue'
 import TierSeal from '@/components/TierSeal.vue'
+import AppIcon from '@/components/AppIcon.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -127,7 +128,7 @@ const forecastLabel = (item: ForecastQuest) => dueLabel(item.due_at, now.value).
 <template>
   <h1 class="page-title">Календарь</h1>
   <p class="page-subtitle">Сроки квестов и что появится по расписанию</p>
-  <div class="flourish">✦</div>
+  <div class="flourish"><AppIcon name="sparkle" :size="14" /></div>
 
   <div class="month-bar">
     <NButton quaternary size="small" aria-label="Предыдущий месяц" @click="goMonth(-1)">
@@ -202,7 +203,9 @@ const forecastLabel = (item: ForecastQuest) => dueLabel(item.due_at, now.value).
           :key="`${item.recurring_quest_id}-${item.period_date}`"
         >
           <TierSeal v-if="tierOf(item.tier_id)" :tier="tierOf(item.tier_id)!" :size="26" />
-          <span class="forecast-name">↻ {{ item.name }}</span>
+          <span class="forecast-name"
+            ><AppIcon name="repeat" :size="16" class="repeat" /> {{ item.name }}</span
+          >
           <span class="forecast-reward num"><CoinIcon :size="14" /> +{{ item.reward }}</span>
           <span class="forecast-when">появится · {{ forecastLabel(item) }}</span>
         </li>
@@ -396,6 +399,10 @@ const forecastLabel = (item: ForecastQuest) => dueLabel(item.due_at, now.value).
   border: 1px dashed var(--color-border);
   border-radius: 2px;
   opacity: 0.85;
+}
+
+.repeat {
+  color: var(--color-muted);
 }
 
 .forecast-name {

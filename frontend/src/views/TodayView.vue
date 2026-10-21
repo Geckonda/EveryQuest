@@ -17,6 +17,7 @@ import EmptyState from '@/components/EmptyState.vue'
 import QuestCard from '@/components/QuestCard.vue'
 import QuestFormModal from '@/components/QuestFormModal.vue'
 import SessionList from '@/components/SessionList.vue'
+import AppIcon from '@/components/AppIcon.vue'
 
 const auth = useAuthStore()
 const catalog = useCatalogStore()
@@ -98,7 +99,7 @@ const stats = computed(() => {
       Повесить квест
     </NButton>
   </div>
-  <div class="flourish">✦</div>
+  <div class="flourish"><AppIcon name="sparkle" :size="14" /></div>
 
   <NAlert v-if="loadError" type="error">{{ loadError }}</NAlert>
   <NSpin v-else :show="loading">

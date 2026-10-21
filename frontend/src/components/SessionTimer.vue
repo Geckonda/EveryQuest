@@ -7,6 +7,7 @@ import type { RewardSession } from '@/api/types'
 import { countdown, formatTime } from '@/utils/format'
 import { playSound } from '@/utils/sound'
 import SessionList from './SessionList.vue'
+import AppIcon from './AppIcon.vue'
 
 /** Идущие траты в шапке: ближайшая — на плашке, все — во всплывающем списке. */
 const sessions = useSessionsStore()
@@ -83,7 +84,7 @@ onUnmounted(() => timers.forEach(clearTimeout))
         :class="nearest.timer.urgency"
         :title="`Идёт: ${nearest.name}`"
       >
-        <span class="hourglass" aria-hidden="true">⏳</span>
+        <AppIcon name="hourglass" :size="16" class="hourglass" />
         <span class="name">{{ nearest.name }}</span>
         <span v-if="nearest.waiting" class="left num">с {{ formatTime(nearest.started_at) }}</span>
         <span v-else class="left num">{{ nearest.timer.left }}</span>
@@ -114,6 +115,10 @@ onUnmounted(() => timers.forEach(clearTimeout))
 
 .session:hover {
   border-color: var(--color-sign-gold);
+}
+
+.hourglass {
+  color: var(--color-sign-gold);
 }
 
 /* Меньше 30 минут — время тает: мягкое мигание песочных часов. */
