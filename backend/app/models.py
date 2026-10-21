@@ -235,13 +235,15 @@ class RewardSession(Base):
 class Transaction(Base):
     __tablename__ = "transactions"
     __table_args__ = (
-        CheckConstraint("type IN ('quest_reward', 'penalty', 'purchase', 'manual')", name="type"),
+        CheckConstraint(
+            "type IN ('quest_reward', 'penalty', 'purchase', 'manual', 'reversal')", name="type"
+        ),
         Index("ix_transactions_user_id_created_at", "user_id", "created_at"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    # +награда, −штраф, −покупка.
+    # +награда, −штраф, −покупка; reversal — отмена ошибочной сдачи или провала квеста.
     amount: Mapped[int] = mapped_column(Integer, nullable=False)
     type: Mapped[str] = mapped_column(String(16), nullable=False)
     quest_id: Mapped[int | None] = mapped_column(ForeignKey("quests.id"))

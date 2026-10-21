@@ -73,6 +73,17 @@ class LoginIn(BaseModel):
     password: str
 
 
+class AuthSessionOut(ORMModel):
+    """Устройство, с которого выполнен вход."""
+
+    id: int
+    user_agent: str | None
+    created_at: datetime
+    # Обновляется при каждом обновлении токена — то есть не реже раза в 15 минут работы.
+    last_used_at: datetime
+    current: bool = False
+
+
 class AccessToken(BaseModel):
     """Refresh-токен в теле не отдаётся — он в httpOnly-cookie."""
 
@@ -358,7 +369,7 @@ class CalendarOut(BaseModel):
 
 # --- транзакции ---
 
-TransactionType = Literal["quest_reward", "penalty", "purchase", "manual"]
+TransactionType = Literal["quest_reward", "penalty", "purchase", "manual", "reversal"]
 
 
 class TransactionOut(ORMModel):

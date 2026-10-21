@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.auth_tokens import is_active
@@ -12,6 +12,7 @@ _bearer = HTTPBearer(auto_error=False)
 
 
 def get_current_user(
+    request: Request,
     db: DbSession,
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
 ) -> User:
@@ -24,6 +25,8 @@ def get_current_user(
         session = db.get(AuthSession, session_id)
         if is_active(session) and session is not None and session.user_id == user_id:
             user = db.get(User, user_id)
+            # Список устройств помечает текущее — эндпоинтам нужен id сессии запроса.
+            request.state.session_id = session_id
     if user is None:
         raise HTTPException(
             status.HTTP_401_UNAUTHORIZED,

@@ -165,6 +165,62 @@ def test_logout_all(client: TestClient) -> None:
     assert client.post(f"{API}/auth/logout-all").status_code == 401
 
 
+def test_list_and_revoke_devices(client: TestClient) -> None:
+    phone = register(client, email="hero@example.com", password="secret-pass")
+    laptop = client.post(
+        f"{API}/auth/login",
+        json={"email": "hero@example.com", "password": "secret-pass"},
+        headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0) Chrome/130.0"},
+    ).json()
+
+    devices = client.get(f"{API}/auth/sessions", headers=auth_headers(laptop)).json()
+    assert len(devices) == 2
+    current = [d for d in devices if d["current"]]
+    assert len(current) == 1
+    assert "Windows" in current[0]["user_agent"]
+    other = next(d for d in devices if not d["current"])
+
+    response = client.post(
+        f"{API}/auth/sessions/{other['id']}/revoke", headers=auth_headers(laptop)
+    )
+    assert response.status_code == 204
+    assert "set-cookie" not in response.headers  # своё устройство не тронуто
+    assert me(client, phone) == 401
+    assert me(client, laptop) == 200
+    assert len(client.get(f"{API}/auth/sessions", headers=auth_headers(laptop)).json()) == 1
+
+
+def test_revoke_current_device_clears_cookie(client: TestClient) -> None:
+    tokens = register(client)
+    [device] = client.get(f"{API}/auth/sessions", headers=auth_headers(tokens)).json()
+
+    response = client.post(
+        f"{API}/auth/sessions/{device['id']}/revoke", headers=auth_headers(tokens)
+    )
+
+    assert response.status_code == 204
+    assert 'eq_refresh=""' in response.headers["set-cookie"]
+    assert me(client, tokens) == 401
+
+
+def test_cannot_revoke_foreign_or_dead_session(client: TestClient) -> None:
+    mine = register(client, email="hero@example.com")
+    [my_device] = client.get(f"{API}/auth/sessions", headers=auth_headers(mine)).json()
+    stranger = register(client, email="stranger@example.com")
+
+    foreign = client.post(
+        f"{API}/auth/sessions/{my_device['id']}/revoke", headers=auth_headers(stranger)
+    )
+    assert foreign.status_code == 404
+    assert me(client, mine) == 200
+    assert (
+        client.post(
+            f"{API}/auth/sessions/999999/revoke", headers=auth_headers(stranger)
+        ).status_code
+        == 404
+    )
+
+
 # --- лимиты попыток ---
 
 

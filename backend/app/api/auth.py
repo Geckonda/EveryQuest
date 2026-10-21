@@ -4,14 +4,22 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
 from app import ratelimit
-from app.auth_tokens import RefreshRejected, revoke_all, revoke_by_token, rotate, start_session
+from app.auth_tokens import (
+    RefreshRejected,
+    is_active,
+    revoke_all,
+    revoke_by_token,
+    rotate,
+    start_session,
+)
 from app.config import settings
 from app.db import DbSession
 from app.defaults import copy_defaults
 from app.deps import CurrentUser
-from app.models import User
+from app.economy import utcnow
+from app.models import AuthSession, User
 from app.ratelimit import LOGIN_BY_EMAIL, LOGIN_BY_IP, REGISTER_BY_IP, TooManyAttempts
-from app.schemas import AccessToken, LoginIn, RegisterIn
+from app.schemas import AccessToken, AuthSessionOut, LoginIn, RegisterIn
 from app.security import create_access_token, hash_password, verify_password
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -161,3 +169,36 @@ def logout_all(user: CurrentUser, response: Response, db: DbSession) -> None:
     revoke_all(db, user.id)
     db.commit()
     _clear_refresh_cookie(response)
+
+
+@router.get("/sessions")
+def list_sessions(user: CurrentUser, request: Request, db: DbSession) -> list[AuthSessionOut]:
+    """Устройства, где выполнен вход: недавно активные сверху, текущее помечено."""
+    sessions = db.scalars(
+        select(AuthSession)
+        .where(
+            AuthSession.user_id == user.id,
+            AuthSession.revoked_at.is_(None),
+            AuthSession.expires_at > utcnow(),
+        )
+        .order_by(AuthSession.last_used_at.desc(), AuthSession.id.desc())
+    )
+    current = request.state.session_id
+    return [
+        AuthSessionOut.model_validate(s).model_copy(update={"current": s.id == current})
+        for s in sessions
+    ]
+
+
+@router.post("/sessions/{session_id}/revoke", status_code=status.HTTP_204_NO_CONTENT)
+def revoke_session(
+    session_id: int, user: CurrentUser, request: Request, response: Response, db: DbSession
+) -> None:
+    """Выйти на конкретном устройстве — например, забытом чужом компьютере."""
+    session = db.get(AuthSession, session_id)
+    if session is None or session.user_id != user.id or not is_active(session):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Не найдено")
+    session.revoked_at = utcnow()
+    db.commit()
+    if session_id == request.state.session_id:
+        _clear_refresh_cookie(response)

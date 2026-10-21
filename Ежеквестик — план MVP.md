@@ -84,7 +84,7 @@ rewards                           -- «траты»
 transactions
   id PK, user_id FK,
   amount INT,                     -- +награда, −штраф, −покупка
-  type,                           -- quest_reward | penalty | purchase | manual
+  type,                           -- quest_reward | penalty | purchase | manual | reversal
   quest_id FK NULL, reward_id FK NULL,
   balance_after INT, created_at
 
@@ -163,6 +163,8 @@ REST под префиксом `/api/v1`. Все ресурсы, кроме auth
 | POST | `/auth/refresh` | Новый access-токен по cookie, refresh-токен ротируется |
 | POST | `/auth/logout` | Выйти на этом устройстве |
 | POST | `/auth/logout-all` | Выйти на всех устройствах |
+| GET | `/auth/sessions` | Устройства, где выполнен вход |
+| POST | `/auth/sessions/{id}/revoke` | Выйти на конкретном устройстве |
 | GET / PATCH | `/me` | Профиль, баланс, часовой пояс |
 | GET / POST | `/tiers` | Список, создание |
 | PATCH | `/tiers/{id}` | Изменение, архивация (409, если есть активные квесты) |
@@ -172,6 +174,7 @@ REST под префиксом `/api/v1`. Все ресурсы, кроме auth
 | PATCH | `/quests/{id}` | Изменение активного квеста |
 | POST | `/quests/{id}/complete` | Выполнить, начислить награду |
 | POST | `/quests/{id}/fail` | Провалить вручную, списать штраф |
+| POST | `/quests/{id}/undo` | Отменить сдачу или ручной провал в течение 10 минут |
 | GET / POST | `/recurring-quests` | Шаблоны повторяющихся квестов |
 | PATCH | `/recurring-quests/{id}` | Изменение, пауза, архивация |
 | GET | `/calendar?start=&end=` | Квесты со сроком в диапазоне (до 62 дней) и прогноз будущих экземпляров повторяющихся |

@@ -52,17 +52,37 @@ def schema_diff(engine: Engine) -> list:
         return compare_metadata(context, Base.metadata)
 
 
+def check_constraints(engine: Engine) -> dict[tuple[str, str], str]:
+    """CHECK-ограничения так, как их хранит Postgres (нормализованный текст).
+
+    compare_metadata их не сравнивает, а автогенерация не видит их изменений —
+    сверяем отдельно с базой, построенной из моделей через create_all.
+    """
+    with engine.connect() as conn:
+        rows = conn.execute(
+            text(
+                "SELECT rel.relname, con.conname, pg_get_constraintdef(con.oid) "
+                "FROM pg_constraint con JOIN pg_class rel ON rel.oid = con.conrelid "
+                "JOIN pg_namespace ns ON ns.oid = rel.relnamespace "
+                "WHERE con.contype = 'c' AND ns.nspname = 'public'"
+            )
+        ).all()
+    return {(table, name): definition for table, name, definition in rows}
+
+
 def user_tables(engine: Engine) -> set[str]:
     return set(inspect(engine).get_table_names()) - {"alembic_version"}
 
 
-def test_upgrade_head_matches_models(empty_engine: Engine) -> None:
+def test_upgrade_head_matches_models(empty_engine: Engine, engine: Engine) -> None:
+    """engine — тестовая база из conftest, построенная из моделей через create_all."""
     with empty_engine.begin() as conn:
         command.upgrade(alembic(conn), "head")
 
     assert user_tables(empty_engine) == set(Base.metadata.tables)
     # Пустой список — миграции дают ровно ту схему, что описана в моделях.
     assert schema_diff(empty_engine) == []
+    assert check_constraints(empty_engine) == check_constraints(engine)
 
 
 def test_downgrade_to_base_and_back(empty_engine: Engine) -> None:

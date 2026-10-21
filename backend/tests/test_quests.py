@@ -403,3 +403,100 @@ def test_archiving_tier_blocked_by_quest_created_via_api(
         f"{API}/tiers/{tiers[0]['id']}", headers=headers, json={"is_archived": True}
     )
     assert allowed.status_code == 200
+
+
+# --- отмена сдачи и провала ---
+
+
+def test_undo_complete_returns_quest_and_takes_reward(
+    client: TestClient, db: Session, headers: dict[str, str], tiers: list[dict]
+) -> None:
+    quest = create_quest(client, headers, tier_id=tiers[2]["id"], due_at=future())
+    client.post(f"{API}/quests/{quest['id']}/complete", headers=headers)
+
+    response = client.post(f"{API}/quests/{quest['id']}/undo", headers=headers)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert (body["quest"]["status"], body["quest"]["close_reason"]) == ("active", None)
+    assert body["quest"]["closed_at"] is None
+    assert body["balance"] == 0
+    transactions = db.scalars(select(Transaction).where(Transaction.quest_id == quest["id"])).all()
+    assert [(t.type, t.amount) for t in transactions] == [
+        ("quest_reward", quest["reward"]),
+        ("reversal", -quest["reward"]),
+    ]
+    # Снова на доске — можно сдать ещё раз.
+    again = client.post(f"{API}/quests/{quest['id']}/complete", headers=headers)
+    assert again.status_code == 200
+
+
+def test_undo_fail_refunds_penalty(
+    client: TestClient, headers: dict[str, str], tiers: list[dict]
+) -> None:
+    quest = create_quest(client, headers, tier_id=tiers[0]["id"], penalty=12)
+    client.post(f"{API}/quests/{quest['id']}/fail", headers=headers)
+    assert balance(client, headers) == -12
+
+    response = client.post(f"{API}/quests/{quest['id']}/undo", headers=headers)
+
+    assert response.status_code == 200
+    assert response.json()["quest"]["penalty_applied"] is False
+    assert balance(client, headers) == 0
+
+
+def test_undo_complete_after_spending_goes_negative(
+    client: TestClient, headers: dict[str, str], tiers: list[dict]
+) -> None:
+    """Награду уже потратили — отмена всё равно её списывает: она была получена по ошибке."""
+    quest = create_quest(client, headers, tier_id=tiers[0]["id"], reward=30)
+    client.post(f"{API}/quests/{quest['id']}/complete", headers=headers)
+    reward = client.post(f"{API}/rewards", headers=headers, json={"name": "Кофе", "price": 30})
+    client.post(f"{API}/rewards/{reward.json()['id']}/purchase", headers=headers)
+
+    assert client.post(f"{API}/quests/{quest['id']}/undo", headers=headers).status_code == 200
+    assert balance(client, headers) == -30
+
+
+@pytest.mark.parametrize("case", ["late", "expired", "archived", "active", "twice"])
+def test_undo_rejected(
+    client: TestClient, db: Session, headers: dict[str, str], tiers: list[dict], case: str
+) -> None:
+    quest = create_quest(client, headers, tier_id=tiers[0]["id"], due_at=future())
+    url = f"{API}/quests/{quest['id']}"
+    if case == "late":
+        client.post(f"{url}/complete", headers=headers)
+        db.get(Quest, quest["id"]).closed_at -= timedelta(minutes=11)
+    elif case == "expired":
+        model = db.get(Quest, quest["id"])
+        model.status, model.close_reason = "failed", "expired"
+        model.closed_at = datetime.now(UTC)
+    elif case == "archived":
+        client.patch(url, headers=headers, json={"status": "archived"})
+    elif case == "twice":
+        client.post(f"{url}/complete", headers=headers)
+        client.post(f"{url}/undo", headers=headers)
+    db.flush()
+
+    response = client.post(f"{url}/undo", headers=headers)
+    assert response.status_code == 409, case
+
+
+def test_undo_rejected_when_deadline_passed(
+    client: TestClient, db: Session, headers: dict[str, str], tiers: list[dict]
+) -> None:
+    quest = create_quest(client, headers, tier_id=tiers[0]["id"], due_at=future())
+    client.post(f"{API}/quests/{quest['id']}/complete", headers=headers)
+    db.get(Quest, quest["id"]).due_at = datetime.now(UTC) - timedelta(minutes=1)
+    db.flush()
+
+    response = client.post(f"{API}/quests/{quest['id']}/undo", headers=headers)
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Срок квеста уже прошёл"
+
+
+def test_undo_foreign_quest(client: TestClient, headers: dict[str, str], tiers: list[dict]) -> None:
+    quest = create_quest(client, headers, tier_id=tiers[0]["id"])
+    client.post(f"{API}/quests/{quest['id']}/complete", headers=headers)
+    stranger = auth_headers(register(client, email="stranger@example.com"))
+    assert client.post(f"{API}/quests/{quest['id']}/undo", headers=stranger).status_code == 404

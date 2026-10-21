@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, status
@@ -13,6 +13,9 @@ from app.models import Quest, User
 from app.schemas import QuestClosed, QuestCreate, QuestOut, QuestStatus, QuestUpdate
 
 router = APIRouter(prefix="/quests", tags=["quests"])
+
+# Сколько можно передумать после «Сдать» или «Провалить» — на случай промаха пальцем.
+UNDO_WINDOW = timedelta(minutes=10)
 
 
 def _check_due_at(due_at: datetime | None) -> None:
@@ -151,5 +154,41 @@ def fail_quest(quest_id: int, user: CurrentUser, db: DbSession) -> QuestClosed:
     quest.penalty_applied = True
     if quest.penalty:
         record_transaction(db, locked_user, -quest.penalty, "penalty", quest_id=quest.id)
+    db.commit()
+    return QuestClosed(quest=QuestOut.model_validate(quest), balance=locked_user.balance)
+
+
+@router.post("/{quest_id}/undo")
+def undo_close(quest_id: int, user: CurrentUser, db: DbSession) -> QuestClosed:
+    """Отменить сдачу или ручной провал в течение UNDO_WINDOW: квест снова на доске.
+
+    Награда списывается (может увести в минус, если уже потрачена — это исправление
+    ошибки, как и штраф), штраф возвращается. Провал по сроку не отменяется — его
+    решил планировщик; и квест с прошедшим сроком сразу провалился бы снова.
+    """
+    locked_user = lock_user(db, user.id)
+    quest = lock_quest(db, quest_id, user.id)
+    if quest is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Не найдено")
+    now = utcnow()
+    if quest.close_reason not in ("completed", "abandoned"):
+        raise HTTPException(status.HTTP_409_CONFLICT, "Этот квест отменить нельзя")
+    if quest.closed_at is None or now - quest.closed_at > UNDO_WINDOW:
+        minutes = int(UNDO_WINDOW.total_seconds() // 60)
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, f"Отменить можно только в течение {minutes} минут"
+        )
+    if quest.due_at is not None and quest.due_at <= now:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Срок квеста уже прошёл")
+
+    amount = -quest.reward if quest.close_reason == "completed" else quest.penalty
+    if quest.close_reason == "abandoned" and not quest.penalty_applied:
+        amount = 0
+    if amount:
+        record_transaction(db, locked_user, amount, "reversal", quest_id=quest.id)
+    quest.status = "active"
+    quest.close_reason = None
+    quest.closed_at = None
+    quest.penalty_applied = False
     db.commit()
     return QuestClosed(quest=QuestOut.model_validate(quest), balance=locked_user.balance)
