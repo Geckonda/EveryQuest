@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { NButton } from 'naive-ui'
 import type { Category, Quest, Tier } from '@/api/types'
-import { countdown, dueLabel, formatDateTime, tierLabel } from '@/utils/format'
+import { canUndo, countdown, dueLabel, formatDateTime, tierLabel } from '@/utils/format'
 import CoinIcon from './CoinIcon.vue'
 import TierSeal from './TierSeal.vue'
 import AppIcon from './AppIcon.vue'
@@ -17,7 +17,7 @@ const props = defineProps<{
 }>()
 
 /** complete передаёт событие клика — от кнопки полетят монеты. */
-defineEmits<{ complete: [event: MouseEvent]; fail: []; edit: []; archive: [] }>()
+defineEmits<{ complete: [event: MouseEvent]; fail: []; edit: []; archive: []; undo: [] }>()
 
 const isActive = computed(() => props.quest.status === 'active')
 const due = computed(() => (props.quest.due_at ? dueLabel(props.quest.due_at, props.now) : null))
@@ -34,6 +34,8 @@ const STAMP = {
   failed: 'Провален',
   archived: 'Снят',
 } as const
+/** Только что закрыт — ещё можно передумать (10 минут). */
+const undoable = computed(() => canUndo(props.quest, props.now))
 const stamp = computed(() => (props.quest.status === 'active' ? null : STAMP[props.quest.status]))
 
 /** Подпись под датой закрытия: почему провален. */
@@ -127,6 +129,9 @@ const failNote = computed(() =>
         >
           Провалить
         </NButton>
+      </div>
+      <div v-if="undoable" class="actions">
+        <NButton size="small" secondary :loading="busy" @click="$emit('undo')">Отменить</NButton>
       </div>
       <p v-if="due?.overdue" class="overdue-note">
         Срок вышел. Гильдия взыщет штраф в ближайшие минуты.

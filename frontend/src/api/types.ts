@@ -1,3 +1,13 @@
+/** Устройство, где выполнен вход. */
+export interface AuthSession {
+  id: number
+  user_agent: string | null
+  created_at: string
+  last_used_at: string
+  /** Это устройство. */
+  current: boolean
+}
+
 /** Refresh-токен в теле не приходит — он в httpOnly-cookie. */
 export interface AccessToken {
   access_token: string
@@ -156,7 +166,7 @@ export interface CalendarData {
   forecast: ForecastQuest[]
 }
 
-export type TransactionType = 'quest_reward' | 'penalty' | 'purchase' | 'manual'
+export type TransactionType = 'quest_reward' | 'penalty' | 'purchase' | 'manual' | 'reversal'
 
 export interface Transaction {
   id: number

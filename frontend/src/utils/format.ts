@@ -113,6 +113,20 @@ export function countdown(createdAt: string, dueAt: string, now = new Date()): C
   return { left: text, urgency, remaining }
 }
 
+/** Окно отмены сдачи или провала — как UNDO_WINDOW на бэкенде. */
+export const UNDO_WINDOW_MS = 10 * 60 * 1000
+
+/** Можно ли ещё отменить закрытие квеста (сдан или провален вручную, окно и срок не прошли). */
+export function canUndo(
+  quest: { close_reason: string | null; closed_at: string | null; due_at: string | null },
+  now: Date,
+): boolean {
+  if (quest.close_reason !== 'completed' && quest.close_reason !== 'abandoned') return false
+  if (!quest.closed_at || now.getTime() - new Date(quest.closed_at).getTime() > UNDO_WINDOW_MS)
+    return false
+  return quest.due_at === null || new Date(quest.due_at) > now
+}
+
 /** «16:20» — время в поясе браузера. */
 export function formatTime(iso: string): string {
   return timeFormat.format(new Date(iso))

@@ -71,6 +71,15 @@ export const useQuestsStore = defineStore('quests', () => {
   const complete = (id: number) => close(id, 'complete')
   const fail = (id: number) => close(id, 'fail')
 
+  /** Передумал: квест возвращается на доску, награда списывается или штраф возвращается. */
+  async function undo(id: number) {
+    const result = await api.post<QuestClosed>(`/quests/${id}/undo`)
+    history.value = history.value.filter((q) => q.id !== id)
+    active.value = [...active.value.filter((q) => q.id !== id), result.quest].sort(byDue)
+    auth.setBalance(result.balance, 'manual')
+    return result.quest
+  }
+
   return {
     active,
     history,
@@ -81,5 +90,6 @@ export const useQuestsStore = defineStore('quests', () => {
     update,
     complete,
     fail,
+    undo,
   }
 })

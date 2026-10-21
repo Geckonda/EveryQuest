@@ -118,6 +118,24 @@ describe('quests store', () => {
     expect(quests.historyHasMore).toBe(false)
   })
 
+  it('отмена возвращает квест на доску и баланс из ответа', async () => {
+    const restored = quest(1, null)
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(json({ quest: restored, balance: 0 }))
+    vi.stubGlobal('fetch', fetchMock)
+    const auth = useAuthStore()
+    auth.user = { id: 1, balance: 10 } as User
+    const quests = useQuestsStore()
+    quests.history = [quest(1, null, { status: 'completed', close_reason: 'completed' })]
+    quests.active = [quest(2, '2026-10-22T10:00:00Z')]
+
+    await quests.undo(1)
+
+    expect(String(fetchMock.mock.calls[0]?.[0])).toMatch(/\/quests\/1\/undo$/)
+    expect(quests.history).toEqual([])
+    expect(quests.active.map((q) => q.id)).toEqual([2, 1]) // без срока — в конце
+    expect(auth.user?.balance).toBe(0)
+  })
+
   it('при смене пользователя списки очищаются', async () => {
     const auth = useAuthStore()
     auth.user = { id: 1 } as User

@@ -16,6 +16,7 @@ const TYPE_LABEL: Record<TransactionType, string> = {
   penalty: 'Штраф гильдии',
   purchase: 'Заказ в таверне',
   manual: 'Поправка казначея',
+  reversal: 'Отмена квеста',
 }
 
 const typeOptions = [

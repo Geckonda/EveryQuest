@@ -20,7 +20,7 @@ const catalog = useCatalogStore()
 const quests = useQuestsStore()
 const recurring = useRecurringStore()
 const message = useMessage()
-const { busyId, complete, fail, archive } = useQuestActions()
+const { busyId, complete, fail, archive, undo } = useQuestActions()
 
 const loading = ref(true)
 const loadError = ref<string | null>(null)
@@ -162,6 +162,8 @@ async function loadMoreHistory() {
             :tier="tierOf(quest)"
             :category="categoryOf(quest)"
             :now="now"
+            :busy="busyId === quest.id"
+            @undo="undo(quest)"
           />
           <div v-if="quests.historyHasMore" class="more">
             <NButton :loading="loadingMore" @click="loadMoreHistory">Показать ещё</NButton>

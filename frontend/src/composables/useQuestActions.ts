@@ -1,5 +1,5 @@
-import { ref } from 'vue'
-import { useDialog, useMessage } from 'naive-ui'
+import { h, ref } from 'vue'
+import { NButton, useDialog, useMessage } from 'naive-ui'
 import type { Quest } from '@/api/types'
 import { errorMessage } from '@/api/errors'
 import { useNow } from '@/composables/useNow'
@@ -33,6 +33,42 @@ export function useQuestActions() {
   /** Квест, по которому идёт запрос — его кнопки крутят индикатор. */
   const busyId = ref<number | null>(null)
 
+  async function undo(quest: Quest) {
+    busyId.value = quest.id
+    try {
+      await quests.undo(quest.id)
+      message.info(`Квест «${quest.name}» снова на доске`)
+    } catch (e) {
+      message.error(errorMessage(e))
+    } finally {
+      busyId.value = null
+    }
+  }
+
+  /** Сообщение с кнопкой «Отменить» — на случай промаха пальцем. */
+  function withUndo(type: 'success' | 'warning', text: string, quest: Quest) {
+    const toast = message[type](
+      () =>
+        h('span', { class: 'undo-message' }, [
+          text,
+          ' ',
+          h(
+            NButton,
+            {
+              text: true,
+              type: 'primary',
+              onClick: () => {
+                toast.destroy()
+                undo(quest)
+              },
+            },
+            () => 'Отменить',
+          ),
+        ]),
+      { duration: 10_000, closable: true },
+    )
+  }
+
   async function complete(quest: Quest, event: MouseEvent) {
     // Точка старта — до запроса: после него карточка уйдёт с доски.
     const from = pointOf(event.currentTarget as Element | null)
@@ -40,7 +76,7 @@ export function useQuestActions() {
     try {
       await quests.complete(quest.id)
       flyCoins(from, purseElement())
-      message.success(`Квест «${quest.name}» сдан. Награда: ${coins(quest.reward)}`)
+      withUndo('success', `Квест «${quest.name}» сдан. Награда: ${coins(quest.reward)}.`, quest)
     } catch (e) {
       message.error(errorMessage(e))
       await quests.loadActive().catch(() => {})
@@ -61,10 +97,12 @@ export function useQuestActions() {
         busyId.value = quest.id
         try {
           await quests.fail(quest.id)
-          message.warning(
+          withUndo(
+            'warning',
             quest.penalty
-              ? `Квест «${quest.name}» провален. Штраф: ${coins(quest.penalty)}`
-              : `Квест «${quest.name}» провален`,
+              ? `Квест «${quest.name}» провален. Штраф: ${coins(quest.penalty)}.`
+              : `Квест «${quest.name}» провален.`,
+            quest,
           )
         } catch (e) {
           message.error(errorMessage(e))
@@ -92,5 +130,5 @@ export function useQuestActions() {
     })
   }
 
-  return { busyId, complete, fail, archive }
+  return { busyId, complete, fail, archive, undo }
 }

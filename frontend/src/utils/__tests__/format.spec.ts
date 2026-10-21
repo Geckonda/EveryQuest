@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { coins, countdown, dueLabel, plural, romanLevel, signed, tierLabel } from '../format'
+import {
+  canUndo,
+  coins,
+  countdown,
+  dueLabel,
+  plural,
+  romanLevel,
+  signed,
+  tierLabel,
+} from '../format'
 
 describe('romanLevel', () => {
   it.each([
@@ -133,5 +142,29 @@ describe('dueLabel', () => {
 
   it('позже — с датой', () => {
     expect(dueLabel(new Date(2026, 9, 25, 9, 0).toISOString(), now).text).toMatch(/^до 25 окт/)
+  })
+})
+
+describe('canUndo', () => {
+  const now = new Date('2026-10-21T12:00:00Z')
+  const ago = (min: number) => new Date(now.getTime() - min * 60_000).toISOString()
+  const quest = (fields: Partial<Parameters<typeof canUndo>[0]>) => ({
+    close_reason: 'completed',
+    closed_at: ago(1),
+    due_at: null,
+    ...fields,
+  })
+
+  it('сдан или провален вручную только что — можно', () => {
+    expect(canUndo(quest({}), now)).toBe(true)
+    expect(canUndo(quest({ close_reason: 'abandoned', closed_at: ago(9.9) }), now)).toBe(true)
+  })
+
+  it('нельзя: окно прошло, срок прошёл, провал по сроку, снят', () => {
+    expect(canUndo(quest({ closed_at: ago(10.1) }), now)).toBe(false)
+    expect(canUndo(quest({ due_at: ago(0.5) }), now)).toBe(false)
+    expect(canUndo(quest({ close_reason: 'expired' }), now)).toBe(false)
+    expect(canUndo(quest({ close_reason: 'archived' }), now)).toBe(false)
+    expect(canUndo(quest({ close_reason: null, closed_at: null }), now)).toBe(false)
   })
 })

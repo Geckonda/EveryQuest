@@ -20,6 +20,7 @@ import { useAuthStore } from '@/stores/auth'
 import { penaltyFor } from '@/utils/penalty'
 import { playSound, soundEnabled } from '@/utils/sound'
 import { useTheme } from '@/composables/useTheme'
+import DeviceList from './DeviceList.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -150,6 +151,7 @@ async function save() {
     </div>
 
     <h3 class="device-title">Безопасность</h3>
+    <DeviceList />
     <p class="hint">
       Потеряли телефон или входили с чужого компьютера — выйдите везде. Войти заново придётся и
       здесь.
