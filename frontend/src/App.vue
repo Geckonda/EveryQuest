@@ -16,10 +16,12 @@ import { useTheme } from '@/composables/useTheme'
 import AppIcon, { type IconName } from '@/components/AppIcon.vue'
 import PurseBadge from '@/components/PurseBadge.vue'
 import SessionTimer from '@/components/SessionTimer.vue'
+import { useQuestsStore } from '@/stores/quests'
 import { useSessionsStore } from '@/stores/sessions'
 
 const auth = useAuthStore()
 const sessions = useSessionsStore()
+const quests = useQuestsStore()
 const route = useRoute()
 const router = useRouter()
 const { isDark } = useTheme()
@@ -61,12 +63,13 @@ watch(
   { immediate: true },
 )
 
-// Вернулись во вкладку — баланс мог измениться (штрафы, другое устройство),
-// а трату могли заказать или закончить на телефоне.
+// Вернулись во вкладку — пока её не было, мог списаться штраф, появиться экземпляр
+// повторяющегося квеста, а на телефоне — сдаться квест или заказаться трата.
 function onVisibilityChange() {
   if (document.visibilityState !== 'visible' || !auth.user) return
   auth.fetchMe().catch(() => {})
   sessions.load().catch(() => {})
+  quests.loadActive().catch(() => {})
 }
 onMounted(() => document.addEventListener('visibilitychange', onVisibilityChange))
 onUnmounted(() => document.removeEventListener('visibilitychange', onVisibilityChange))
