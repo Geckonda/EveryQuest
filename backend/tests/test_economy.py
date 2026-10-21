@@ -177,16 +177,19 @@ def test_balance_matches_transactions_sum(
 
 
 def run_concurrently(n: int, request) -> list[int]:
-    """Запускает n одинаковых запросов одновременно, возвращает коды ответов."""
+    """Запускает n запросов одновременно, возвращает коды ответов.
+
+    request(client, i) получает номер потока — чтобы смешивать разные запросы.
+    """
     barrier = threading.Barrier(n)
     codes: list[int] = []
 
-    def worker() -> None:
+    def worker(i: int) -> None:
         with TestClient(app) as client:
             barrier.wait()
-            codes.append(request(client).status_code)
+            codes.append(request(client, i).status_code)
 
-    threads = [threading.Thread(target=worker) for _ in range(n)]
+    threads = [threading.Thread(target=worker, args=(i,)) for i in range(n)]
     for thread in threads:
         thread.start()
     for thread in threads:
@@ -202,7 +205,7 @@ def test_concurrent_purchases_do_not_overspend(engine: Engine) -> None:
         reward = create_reward(client, headers, 30)
 
     codes = run_concurrently(
-        5, lambda c: c.post(f"{API}/rewards/{reward['id']}/purchase", headers=headers)
+        5, lambda c, _: c.post(f"{API}/rewards/{reward['id']}/purchase", headers=headers)
     )
 
     assert codes == [200, 400, 400, 400, 400]
@@ -220,7 +223,7 @@ def test_concurrent_completion_rewards_once(engine: Engine) -> None:
         ).json()
 
     codes = run_concurrently(
-        5, lambda c: c.post(f"{API}/quests/{quest['id']}/complete", headers=headers)
+        5, lambda c, _: c.post(f"{API}/quests/{quest['id']}/complete", headers=headers)
     )
 
     assert codes == [200, 409, 409, 409, 409]
@@ -230,3 +233,34 @@ def test_concurrent_completion_rewards_once(engine: Engine) -> None:
         )
         assert rewards == 1
         assert session.get(Quest, quest["id"]).status == "completed"
+
+
+@pytest.mark.usefixtures("committing_db")
+def test_concurrent_complete_and_fail(engine: Engine) -> None:
+    """Сдача и провал одновременно: побеждает один, деньги двигаются один раз."""
+    with TestClient(app) as client:
+        headers = auth_headers(register(client, email="race-fail@example.com"))
+        tier_id = client.get(f"{API}/tiers", headers=headers).json()[0]["id"]
+        quest = client.post(
+            f"{API}/quests",
+            headers=headers,
+            json={"name": "Гонка", "tier_id": tier_id, "reward": 10, "penalty": 5},
+        ).json()
+
+    actions = ["complete", "fail"] * 3
+    codes = run_concurrently(
+        len(actions),
+        lambda c, i: c.post(f"{API}/quests/{quest['id']}/{actions[i]}", headers=headers),
+    )
+
+    assert codes == [200, 409, 409, 409, 409, 409]
+    with Session(engine) as session:
+        final = session.get(Quest, quest["id"])
+        types = session.scalars(
+            select(Transaction.type).where(Transaction.quest_id == quest["id"])
+        ).all()
+        user_balance = session.scalar(select(User.balance).where(User.id == final.user_id))
+    assert (final.status, types, user_balance) in [
+        ("completed", ["quest_reward"], 10),
+        ("failed", ["penalty"], -5),
+    ]

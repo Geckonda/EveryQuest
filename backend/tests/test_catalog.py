@@ -120,8 +120,8 @@ def test_archive_tier_allowed_with_finished_quests(
     client: TestClient, db: Session, headers: dict[str, str]
 ) -> None:
     user_id, tier_id = me_id(client, headers), first_id(client, headers, "tiers")
-    add_quest(db, user_id, tier_id, status="completed")
-    add_quest(db, user_id, tier_id, status="failed")
+    add_quest(db, user_id, tier_id, status="completed", close_reason="completed")
+    add_quest(db, user_id, tier_id, status="failed", close_reason="expired")
     add_template(db, user_id, tier_id, is_archived=True)
 
     response = client.patch(f"{API}/tiers/{tier_id}", headers=headers, json={"is_archived": True})

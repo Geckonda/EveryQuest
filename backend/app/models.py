@@ -120,6 +120,14 @@ class Quest(Base):
     __tablename__ = "quests"
     __table_args__ = (
         CheckConstraint("status IN ('active', 'completed', 'failed', 'archived')", name="status"),
+        # Причина закрытия обязана соответствовать статусу; у активного её нет.
+        CheckConstraint(
+            "(status = 'active' AND close_reason IS NULL)"
+            " OR (status = 'completed' AND close_reason = 'completed')"
+            " OR (status = 'failed' AND close_reason IN ('expired', 'abandoned'))"
+            " OR (status = 'archived' AND close_reason = 'archived')",
+            name="close_reason",
+        ),
         UniqueConstraint("recurring_quest_id", "period_date"),
         Index("ix_quests_status_due_at", "status", "due_at"),
     )
@@ -137,7 +145,10 @@ class Quest(Base):
     status: Mapped[str] = mapped_column(String(16), server_default="active", nullable=False)
     created_at: Mapped[datetime] = created_at_column()
     due_at: Mapped[datetime | None] = mapped_column(TZDateTime)
-    completed_at: Mapped[datetime | None] = mapped_column(TZDateTime)
+    # Когда квест закрыт любым способом; у проваленного по сроку — сам срок.
+    closed_at: Mapped[datetime | None] = mapped_column(TZDateTime)
+    # completed | expired (срок вышел) | abandoned (провален вручную) | archived (снят).
+    close_reason: Mapped[str | None] = mapped_column(String(16))
     penalty_applied: Mapped[bool] = mapped_column(Boolean, server_default="false", nullable=False)
 
 

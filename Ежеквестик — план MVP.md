@@ -70,7 +70,9 @@ quests                            -- конкретный квест (разов
   period_date DATE NULL,          -- за какой день/период экземпляр
   name, description, reward INT, penalty INT,
   status,                         -- active | completed | failed | archived
-  created_at, due_at NULL, completed_at NULL,
+  created_at, due_at NULL,
+  closed_at NULL,                 -- когда закрыт; у проваленного по сроку = due_at
+  close_reason NULL,              -- completed | expired | abandoned | archived (CHECK: согласовано со status)
   penalty_applied BOOL DEFAULT false
   UNIQUE (recurring_quest_id, period_date)
 
@@ -127,7 +129,8 @@ transactions
 
 **Квесты**
 
-- Выполнить можно только `active` квест: `status = completed`, `completed_at = now`, `balance += reward`.
+- Выполнить можно только `active` квест: `status = completed`, `closed_at = now`, `balance += reward`.
+- Провалить вручную (`POST /quests/{id}/fail`) можно только `active` квест с непрошедшим сроком: `status = failed`, `close_reason = abandoned`, штраф списывается полностью (в минус можно).
 - Выполнение просроченного, но ещё не обработанного квеста запрещено: он уже провален.
 - Отмена выполнения — не в MVP. Ошибку правит ручная транзакция `manual`.
 
@@ -160,6 +163,7 @@ REST под префиксом `/api/v1`. Все ресурсы, кроме auth
 | GET / POST | `/quests` | Список с фильтрами `status`, `category_id`, `tier_id`; создание разового |
 | PATCH | `/quests/{id}` | Изменение активного квеста |
 | POST | `/quests/{id}/complete` | Выполнить, начислить награду |
+| POST | `/quests/{id}/fail` | Провалить вручную, списать штраф |
 | GET / POST | `/recurring-quests` | Шаблоны повторяющихся квестов |
 | PATCH | `/recurring-quests/{id}` | Изменение, пауза, архивация |
 | GET / POST | `/rewards` | Траты: список, создание |

@@ -3,13 +3,14 @@ from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from app.crud import apply_changes, check_quest_refs, get_owned
 from app.db import DbSession
 from app.deps import CurrentUser
-from app.economy import default_penalty, lock_user, record_transaction, utcnow
-from app.models import Quest
-from app.schemas import QuestCompleted, QuestCreate, QuestOut, QuestStatus, QuestUpdate
+from app.economy import default_penalty, lock_quest, lock_user, record_transaction, utcnow
+from app.models import Quest, User
+from app.schemas import QuestClosed, QuestCreate, QuestOut, QuestStatus, QuestUpdate
 
 router = APIRouter(prefix="/quests", tags=["quests"])
 
@@ -102,28 +103,46 @@ def update_quest(quest_id: int, data: QuestUpdate, user: CurrentUser, db: DbSess
             )
     if "due_at" in changes:
         _check_due_at(changes["due_at"])
+    if changes.get("status") == "archived":
+        changes |= {"close_reason": "archived", "closed_at": utcnow()}
 
     apply_changes(quest, changes)
     db.commit()
     return QuestOut.model_validate(quest)
 
 
-@router.post("/{quest_id}/complete")
-def complete_quest(quest_id: int, user: CurrentUser, db: DbSession) -> QuestCompleted:
+def _lock_active(db: Session, user: User, quest_id: int) -> tuple[User, Quest]:
+    """Блокировки в общем порядке (пользователь → квест) и проверка, что квест ещё открыт."""
     locked_user = lock_user(db, user.id)
-    # Квест тоже блокируется: иначе два параллельных запроса начислили бы награду дважды.
-    quest = db.execute(
-        select(Quest)
-        .where(Quest.id == quest_id, Quest.user_id == user.id)
-        .with_for_update()
-        .execution_options(populate_existing=True)
-    ).scalar_one_or_none()
+    quest = lock_quest(db, quest_id, user.id)
     if quest is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Не найдено")
     _ensure_active(quest)
+    return locked_user, quest
 
-    quest.status = "completed"
-    quest.completed_at = utcnow()
+
+@router.post("/{quest_id}/complete")
+def complete_quest(quest_id: int, user: CurrentUser, db: DbSession) -> QuestClosed:
+    locked_user, quest = _lock_active(db, user, quest_id)
+    quest.status = quest.close_reason = "completed"
+    quest.closed_at = utcnow()
     record_transaction(db, locked_user, quest.reward, "quest_reward", quest_id=quest.id)
     db.commit()
-    return QuestCompleted(quest=QuestOut.model_validate(quest), balance=locked_user.balance)
+    return QuestClosed(quest=QuestOut.model_validate(quest), balance=locked_user.balance)
+
+
+@router.post("/{quest_id}/fail")
+def fail_quest(quest_id: int, user: CurrentUser, db: DbSession) -> QuestClosed:
+    """Признать квест проваленным до срока: штраф списывается полностью, как при просрочке.
+
+    В минус уйти можно — это штраф, а не покупка.
+    """
+    locked_user, quest = _lock_active(db, user, quest_id)
+    quest.status = "failed"
+    quest.close_reason = "abandoned"
+    quest.closed_at = utcnow()
+    quest.penalty_applied = True
+    if quest.penalty:
+        record_transaction(db, locked_user, -quest.penalty, "penalty", quest_id=quest.id)
+    db.commit()
+    return QuestClosed(quest=QuestOut.model_validate(quest), balance=locked_user.balance)

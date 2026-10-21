@@ -194,6 +194,7 @@ class RewardUpdate(PatchModel):
 # --- квесты ---
 
 QuestStatus = Literal["active", "completed", "failed", "archived"]
+CloseReason = Literal["completed", "expired", "abandoned", "archived"]
 
 
 class QuestOut(ORMModel):
@@ -209,7 +210,8 @@ class QuestOut(ORMModel):
     status: QuestStatus
     created_at: datetime
     due_at: datetime | None
-    completed_at: datetime | None
+    closed_at: datetime | None
+    close_reason: CloseReason | None
     penalty_applied: bool
 
 
@@ -238,7 +240,9 @@ class QuestUpdate(PatchModel):
     status: Literal["archived"] | None = None
 
 
-class QuestCompleted(BaseModel):
+class QuestClosed(BaseModel):
+    """Ответ на сдачу или провал квеста: квест и новый баланс."""
+
     quest: QuestOut
     balance: int
 

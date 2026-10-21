@@ -13,7 +13,7 @@ from decimal import ROUND_HALF_UP, Decimal
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Reward, Transaction, User
+from app.models import Quest, Reward, Transaction, User
 from app.schemas import TransactionType
 
 
@@ -52,6 +52,20 @@ def lock_user(db: Session, user_id: int) -> User:
         .with_for_update()
         .execution_options(populate_existing=True)
     ).scalar_one()
+
+
+def lock_quest(db: Session, quest_id: int, user_id: int | None = None) -> Quest | None:
+    """Блокирует квест (после lock_user!) и перечитывает его; None — нет такого или чужой.
+
+    Без блокировки два параллельных запроса сдали бы квест дважды,
+    а сдача в последнюю секунду разошлась бы со штрафом планировщика.
+    """
+    query = select(Quest).where(Quest.id == quest_id)
+    if user_id is not None:
+        query = query.where(Quest.user_id == user_id)
+    return db.execute(
+        query.with_for_update().execution_options(populate_existing=True)
+    ).scalar_one_or_none()
 
 
 def record_transaction(

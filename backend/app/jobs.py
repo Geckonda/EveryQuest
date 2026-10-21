@@ -11,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from app.economy import lock_user, record_transaction
+from app.economy import lock_quest, lock_user, record_transaction
 from app.models import Quest, RecurringQuest, User
 from app.recurrence import due_at_for, local_today, period_for
 
@@ -91,18 +91,20 @@ def apply_penalties(db: Session, now: datetime) -> int:
     penalized = 0
     for quest_id, user_id in candidates:
         user = lock_user(db, user_id)
-        quest = db.execute(
-            select(Quest)
-            .where(Quest.id == quest_id)
-            .with_for_update()
-            .execution_options(populate_existing=True)
-        ).scalar_one()
-        # Пока ждали блокировку, квест могли выполнить или убрать.
-        if quest.status != "active" or quest.penalty_applied or quest.due_at is None:
+        quest = lock_quest(db, quest_id)
+        # Пока ждали блокировку, квест могли выполнить, провалить или убрать.
+        if (
+            quest is None
+            or quest.status != "active"
+            or quest.penalty_applied
+            or quest.due_at is None
+        ):
             db.commit()  # ничего не меняли — просто отпускаем блокировки
             continue
 
         quest.status = "failed"
+        quest.close_reason = "expired"
+        quest.closed_at = quest.due_at
         quest.penalty_applied = True
         if quest.penalty:
             record_transaction(db, user, -quest.penalty, "penalty", quest_id=quest.id)

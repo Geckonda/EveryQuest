@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.defaults import DEFAULT_TIERS
 from app.economy import default_penalty
+from app.jobs import apply_penalties
 from app.models import Quest, Transaction
 from tests.conftest import auth_headers, register
 
@@ -216,11 +217,15 @@ def test_archive_quest(client: TestClient, headers: dict[str, str], tiers: list[
         f"{API}/quests/{quest['id']}", headers=headers, json={"status": "archived"}
     )
     assert archived.json()["status"] == "archived"
+    assert archived.json()["close_reason"] == "archived"
+    assert archived.json()["closed_at"] is not None
 
     for body in ({"status": "active"}, {"status": "completed"}):
         response = client.patch(f"{API}/quests/{quest['id']}", headers=headers, json=body)
         assert response.status_code in (409, 422)
-    assert client.post(f"{API}/quests/{quest['id']}/complete", headers=headers).status_code == 409
+    for action in ("complete", "fail"):
+        response = client.post(f"{API}/quests/{quest['id']}/{action}", headers=headers)
+        assert response.status_code == 409
     assert balance(client, headers) == 0
 
 
@@ -232,8 +237,9 @@ def test_cannot_touch_other_users_quest(
 
     patch = client.patch(f"{API}/quests/{quest['id']}", headers=stranger, json={"name": "Моё"})
     assert patch.status_code == 404
-    complete = client.post(f"{API}/quests/{quest['id']}/complete", headers=stranger)
-    assert complete.status_code == 404
+    for action in ("complete", "fail"):
+        response = client.post(f"{API}/quests/{quest['id']}/{action}", headers=stranger)
+        assert response.status_code == 404
     assert client.get(f"{API}/quests", headers=stranger).json() == []
     assert balance(client, stranger) == 0
 
@@ -250,7 +256,8 @@ def test_complete_credits_reward_once(
     assert response.status_code == 200
     body = response.json()
     assert body["quest"]["status"] == "completed"
-    assert body["quest"]["completed_at"] is not None
+    assert body["quest"]["close_reason"] == "completed"
+    assert body["quest"]["closed_at"] is not None
     assert body["balance"] == quest["reward"]
     assert balance(client, headers) == quest["reward"]
 
@@ -289,7 +296,56 @@ def test_cannot_complete_or_edit_overdue_quest(
 
     extend = client.patch(f"{API}/quests/{quest['id']}", headers=headers, json={"due_at": future()})
     assert extend.status_code == 409
+    # Провалить вручную тоже нельзя: штраф спишет планировщик, иначе он списался бы дважды.
+    fail = client.post(f"{API}/quests/{quest['id']}/fail", headers=headers)
+    assert fail.status_code == 409
     assert balance(client, headers) == 0
+
+
+# --- провал вручную ---
+
+
+def test_fail_charges_full_penalty_once(
+    client: TestClient, db: Session, headers: dict[str, str], tiers: list[dict]
+) -> None:
+    quest = create_quest(client, headers, tier_id=tiers[1]["id"], penalty=30, due_at=future())
+
+    response = client.post(f"{API}/quests/{quest['id']}/fail", headers=headers)
+    assert response.status_code == 200
+    body = response.json()
+    assert (body["quest"]["status"], body["quest"]["close_reason"]) == ("failed", "abandoned")
+    assert body["quest"]["penalty_applied"] is True
+    assert body["quest"]["closed_at"] is not None
+    assert body["balance"] == -30  # в минус можно — это штраф
+
+    for action in ("fail", "complete"):
+        again = client.post(f"{API}/quests/{quest['id']}/{action}", headers=headers)
+        assert again.status_code == 409
+    assert balance(client, headers) == -30
+
+    transactions = db.scalars(select(Transaction).where(Transaction.quest_id == quest["id"])).all()
+    assert [(t.type, t.amount) for t in transactions] == [("penalty", -30)]
+
+
+def test_fail_without_due_date_and_zero_penalty(
+    client: TestClient, db: Session, headers: dict[str, str], tiers: list[dict]
+) -> None:
+    quest = create_quest(client, headers, tier_id=tiers[0]["id"], penalty=0)
+
+    response = client.post(f"{API}/quests/{quest['id']}/fail", headers=headers)
+    assert response.status_code == 200
+    assert response.json()["balance"] == 0
+    assert db.scalars(select(Transaction).where(Transaction.quest_id == quest["id"])).all() == []
+
+
+def test_failed_quest_is_not_penalized_again(
+    client: TestClient, db: Session, headers: dict[str, str], tiers: list[dict]
+) -> None:
+    quest = create_quest(client, headers, tier_id=tiers[0]["id"], penalty=5, due_at=future(1))
+    client.post(f"{API}/quests/{quest['id']}/fail", headers=headers)
+
+    assert apply_penalties(db, datetime.now(UTC) + timedelta(hours=2)) == 0
+    assert balance(client, headers) == -5
 
 
 def test_archiving_tier_blocked_by_quest_created_via_api(

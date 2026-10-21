@@ -49,7 +49,7 @@ def test_overdue_quest_fails_with_penalty(db: Session, user_id: int) -> None:
     db.refresh(quest)
     assert quest.status == "failed"
     assert quest.penalty_applied is True
-    assert quest.completed_at is None
+    assert (quest.close_reason, quest.closed_at) == ("expired", quest.due_at)
     assert db.get(User, user_id).balance == -25  # в минус можно — от штрафов
     transaction = db.scalars(select(Transaction).where(Transaction.quest_id == quest.id)).one()
     assert (transaction.type, transaction.amount, transaction.balance_after) == (
@@ -76,8 +76,16 @@ def test_untouched_quests(db: Session, user_id: int) -> None:
         add_quest(db, user_id, due_at=NOW + timedelta(minutes=1)),  # ещё не срок
         add_quest(db, user_id, due_at=NOW),  # ровно сейчас — ещё не просрочен
         add_quest(db, user_id, due_at=None),  # без срока
-        add_quest(db, user_id, due_at=NOW - timedelta(hours=1), status="completed"),
-        add_quest(db, user_id, due_at=NOW - timedelta(hours=1), status="archived"),
+        add_quest(
+            db,
+            user_id,
+            due_at=NOW - timedelta(hours=1),
+            status="completed",
+            close_reason="completed",
+        ),
+        add_quest(
+            db, user_id, due_at=NOW - timedelta(hours=1), status="archived", close_reason="archived"
+        ),
     ]
 
     assert apply_penalties(db, NOW) == 0
