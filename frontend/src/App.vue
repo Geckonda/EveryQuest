@@ -13,7 +13,7 @@ import {
 } from 'naive-ui'
 import { useAuthStore } from '@/stores/auth'
 import { darkOverrides, lightOverrides } from '@/theme'
-import CoinIcon from '@/components/CoinIcon.vue'
+import PurseBadge from '@/components/PurseBadge.vue'
 
 const auth = useAuthStore()
 const route = useRoute()
@@ -50,7 +50,8 @@ onUnmounted(() => document.removeEventListener('visibilitychange', onVisibilityC
     :locale="ruRU"
     :date-locale="dateRuRU"
   >
-    <NMessageProvider>
+    <!-- Сообщения снизу: сверху они закрывали бы кошелёк и его анимацию. -->
+    <NMessageProvider placement="bottom">
       <NDialogProvider>
         <header class="sign">
           <div class="sign-row">
@@ -76,14 +77,7 @@ onUnmounted(() => document.removeEventListener('visibilitychange', onVisibilityC
               Ежеквестик
             </RouterLink>
             <div v-if="auth.user" class="account">
-              <span
-                class="purse num"
-                :class="{ negative: auth.user.balance < 0 }"
-                :title="auth.user.balance < 0 ? 'Долг перед гильдией' : 'Кошель'"
-              >
-                <CoinIcon :size="18" />
-                {{ auth.user.balance }}
-              </span>
+              <PurseBadge :balance="auth.user.balance" />
               <span class="username">{{ auth.user.username }}</span>
               <NButton size="small" quaternary class="leave" @click="logout">Уйти</NButton>
             </div>
@@ -151,25 +145,6 @@ onUnmounted(() => document.removeEventListener('visibilitychange', onVisibilityC
   align-items: center;
   gap: 10px;
   min-width: 0;
-}
-
-.purse {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 2px 10px 2px 6px;
-  border: 1px solid rgba(231, 178, 79, 0.45);
-  border-radius: 999px;
-  background: rgba(0, 0, 0, 0.25);
-  color: var(--color-sign-gold);
-  font-size: 1.05rem;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.purse.negative {
-  color: #ff9c86;
-  border-color: rgba(255, 120, 100, 0.5);
 }
 
 .username {

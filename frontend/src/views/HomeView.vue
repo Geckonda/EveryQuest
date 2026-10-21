@@ -7,6 +7,7 @@ import { coins } from '@/utils/format'
 import { filterQuests } from '@/utils/questFilters'
 import { useQuestFilters } from '@/composables/useQuestFilters'
 import { useNow } from '@/composables/useNow'
+import { flyCoins, pointOf, purseElement } from '@/utils/coinFx'
 import { useCatalogStore } from '@/stores/catalog'
 import { useQuestsStore } from '@/stores/quests'
 import { useRecurringStore } from '@/stores/recurring'
@@ -82,10 +83,13 @@ function open(quest: Quest | null) {
   modal.value = true
 }
 
-async function complete(quest: Quest) {
+async function complete(quest: Quest, event: MouseEvent) {
+  // Точка старта — до запроса: после него карточка уйдёт с доски.
+  const from = pointOf(event.currentTarget as Element | null)
   busyId.value = quest.id
   try {
     await quests.complete(quest.id)
+    flyCoins(from, purseElement())
     message.success(`Квест «${quest.name}» сдан. Награда: ${coins(quest.reward)}`)
   } catch (e) {
     message.error(errorMessage(e))
@@ -205,7 +209,7 @@ async function loadMoreHistory() {
           :category="categoryOf(quest)"
           :now="now"
           :busy="busyId === quest.id"
-          @complete="complete(quest)"
+          @complete="complete(quest, $event)"
           @fail="fail(quest)"
           @edit="open(quest)"
           @archive="archive(quest)"

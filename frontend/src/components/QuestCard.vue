@@ -15,7 +15,8 @@ const props = defineProps<{
   busy?: boolean
 }>()
 
-defineEmits<{ complete: []; fail: []; edit: []; archive: [] }>()
+/** complete передаёт событие клика — от кнопки полетят монеты. */
+defineEmits<{ complete: [event: MouseEvent]; fail: []; edit: []; archive: [] }>()
 
 const isActive = computed(() => props.quest.status === 'active')
 const due = computed(() => (props.quest.due_at ? dueLabel(props.quest.due_at, props.now) : null))
@@ -102,7 +103,7 @@ const failNote = computed(() =>
           size="small"
           :disabled="due?.overdue"
           :loading="busy"
-          @click="$emit('complete')"
+          @click="$emit('complete', $event)"
         >
           Сдать квест
         </NButton>

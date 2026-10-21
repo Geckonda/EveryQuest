@@ -51,7 +51,7 @@ async function save() {
       amount: signedAmount.value,
       note: note.value.trim() || null,
     })
-    auth.setBalance(result.balance)
+    auth.setBalance(result.balance, 'manual')
     message.success(`Баланс: ${coins(result.balance)}`)
     emit('saved')
     show.value = false

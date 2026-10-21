@@ -8,6 +8,7 @@ import { useCatalogStore } from '@/stores/catalog'
 import { useArchiveToggle } from '@/composables/useArchiveToggle'
 import { coins } from '@/utils/format'
 import { DEFAULT_REWARD_FILTERS, filterRewards } from '@/utils/rewardFilters'
+import { flyCoins, purseElement } from '@/utils/coinFx'
 import CatalogSection from '@/components/CatalogSection.vue'
 import CoinIcon from '@/components/CoinIcon.vue'
 import RewardFormModal from '@/components/RewardFormModal.vue'
@@ -50,7 +51,9 @@ function open(reward: Reward | null) {
   modal.value = true
 }
 
-function buy(reward: Reward) {
+function buy(reward: Reward, event: MouseEvent) {
+  // Запоминаем кнопку до диалога: к ней из кошелька полетят монеты.
+  const button = event.currentTarget as Element | null
   dialog.info({
     title: 'Заказать?',
     content: `«${reward.name}» за ${coins(reward.price)}. В кошеле останется ${coins(balance.value - reward.price)}.`,
@@ -60,6 +63,7 @@ function buy(reward: Reward) {
       buyingId.value = reward.id
       try {
         await catalog.purchase(reward.id)
+        flyCoins(purseElement(), button)
         message.success(`«${reward.name}» — ваше. Славного отдыха, путник!`)
       } catch (e) {
         message.error(errorMessage(e))
@@ -128,7 +132,7 @@ function buy(reward: Reward) {
           :disabled="balance < reward.price"
           :title="balance < reward.price ? `Не хватает ${reward.price - balance}` : undefined"
           :loading="buyingId === reward.id"
-          @click="buy(reward)"
+          @click="buy(reward, $event)"
         >
           Заказать
         </NButton>

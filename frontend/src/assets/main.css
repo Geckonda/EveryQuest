@@ -181,6 +181,17 @@ a {
   margin-bottom: 16px;
 }
 
+/* Монета, летящая к кошельку или из него (utils/coinFx.ts). */
+.flying-coin {
+  position: fixed;
+  z-index: 3000;
+  border: 1px solid #7a4f0e;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff1b8, #e9b949 45%, #a8701a);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+
 /* Кнопка, которая выглядит как ссылка в тексте подсказки: «сбросить», «подставить». */
 .link-button {
   padding: 0;

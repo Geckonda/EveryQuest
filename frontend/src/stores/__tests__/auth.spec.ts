@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
+import type { User } from '@/api/types'
 import { useAuthStore } from '../auth'
 
 const json = (status: number, body: unknown) =>
@@ -51,5 +52,40 @@ describe('auth store', () => {
     expect(results).toEqual([true, true, true])
     expect(fetchMock).toHaveBeenCalledOnce()
     expect(auth.accessToken).toBe('fresh')
+  })
+
+  it('изменение баланса объявляется с суммой и причиной', () => {
+    const auth = useAuthStore()
+    auth.user = { id: 1, balance: 100 } as User
+
+    auth.setBalance(70, 'purchase')
+    expect(auth.coinEvent).toMatchObject({ delta: -30, reason: 'purchase' })
+    const first = auth.coinEvent?.id
+
+    auth.setBalance(40, 'purchase')
+    expect(auth.coinEvent?.id).not.toBe(first) // одинаковые покупки подряд — разные события
+
+    auth.setBalance(40, 'reward')
+    expect(auth.coinEvent).toMatchObject({ delta: -30 }) // без изменения — без события
+  })
+
+  it('fetchMe объявляет изменение баланса, но не первую загрузку и не чужой профиль', async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(json(200, { id: 1, balance: 50 }))
+      .mockResolvedValueOnce(json(200, { id: 1, balance: 45 }))
+      .mockResolvedValueOnce(json(200, { id: 2, balance: 999 }))
+    vi.stubGlobal('fetch', fetchMock)
+    localStorage.setItem('eq.accessToken', 'a')
+    const auth = useAuthStore()
+
+    await auth.fetchMe()
+    expect(auth.coinEvent).toBeNull()
+
+    await auth.fetchMe()
+    expect(auth.coinEvent).toMatchObject({ delta: -5, reason: 'sync' })
+
+    await auth.fetchMe()
+    expect(auth.coinEvent).toMatchObject({ delta: -5 })
   })
 })

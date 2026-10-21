@@ -25,10 +25,27 @@ const storage = {
   },
 }
 
+/** Почему изменился баланс: от этого зависят звук и анимация кошелька. */
+export type CoinReason = 'reward' | 'purchase' | 'penalty' | 'manual' | 'sync'
+
+export interface CoinEvent {
+  /** Растёт с каждым событием — чтобы два одинаковых изменения подряд различались. */
+  id: number
+  delta: number
+  reason: CoinReason
+}
+
 export const useAuthStore = defineStore('auth', () => {
   const accessToken = ref(storage.get(ACCESS_KEY))
   const refreshToken = ref(storage.get(REFRESH_KEY))
   const user = ref<User | null>(null)
+  /** Последнее изменение баланса; null — ещё не было. */
+  const coinEvent = ref<CoinEvent | null>(null)
+  let coinEventId = 0
+
+  function announce(delta: number, reason: CoinReason) {
+    if (delta !== 0) coinEvent.value = { id: ++coinEventId, delta, reason }
+  }
 
   const isAuthenticated = computed(() => refreshToken.value !== null)
 
@@ -79,7 +96,11 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function fetchMe() {
-    user.value = await api.get<User>('/me')
+    const before = user.value
+    const fresh = await api.get<User>('/me')
+    // Баланс поменялся «сам» — штраф планировщика или операция на другом устройстве.
+    if (before && before.id === fresh.id) announce(fresh.balance - before.balance, 'sync')
+    user.value = fresh
   }
 
   async function updateMe(payload: Partial<UserPayload>) {
@@ -92,14 +113,17 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /** Баланс из ответа операции с монетами — без лишнего запроса /me. */
-  function setBalance(balance: number) {
-    if (user.value) user.value = { ...user.value, balance }
+  function setBalance(balance: number, reason: CoinReason = 'sync') {
+    if (!user.value) return
+    announce(balance - user.value.balance, reason)
+    user.value = { ...user.value, balance }
   }
 
   return {
     accessToken,
     refreshToken,
     user,
+    coinEvent,
     isAuthenticated,
     refresh,
     login,

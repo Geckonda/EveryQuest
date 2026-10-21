@@ -85,7 +85,7 @@ export const useCatalogStore = defineStore('catalog', () => {
 
   async function purchase(rewardId: number) {
     const result = await api.post<BalanceChange>(`/rewards/${rewardId}/purchase`)
-    auth.setBalance(result.balance)
+    auth.setBalance(result.balance, 'purchase')
     return result
   }
 

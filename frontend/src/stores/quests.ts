@@ -64,7 +64,7 @@ export const useQuestsStore = defineStore('quests', () => {
     const result = await api.post<QuestClosed>(`/quests/${id}/${action}`)
     active.value = active.value.filter((q) => q.id !== id)
     history.value = [result.quest, ...history.value]
-    auth.setBalance(result.balance)
+    auth.setBalance(result.balance, action === 'complete' ? 'reward' : 'penalty')
     return result.quest
   }
 

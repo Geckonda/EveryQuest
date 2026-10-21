@@ -8,11 +8,13 @@ import {
   NInput,
   NInputNumber,
   NSelect,
+  NSwitch,
   useMessage,
 } from 'naive-ui'
 import { errorMessage } from '@/api/errors'
 import { useAuthStore } from '@/stores/auth'
 import { penaltyFor } from '@/utils/penalty'
+import { playSound, soundEnabled } from '@/utils/sound'
 
 const auth = useAuthStore()
 const message = useMessage()
@@ -98,6 +100,17 @@ async function save() {
     <NButton type="primary" attr-type="submit" :loading="saving" :disabled="!isComplete">
       Сохранить
     </NButton>
+
+    <h3 class="device-title">На этом устройстве</h3>
+    <div class="device-row">
+      <label class="switch">
+        <NSwitch v-model:value="soundEnabled" />
+        Звон монет
+      </label>
+      <NButton size="small" quaternary :disabled="!soundEnabled" @click="playSound('reward')">
+        Послушать
+      </NButton>
+    </div>
   </NForm>
 </template>
 
@@ -115,5 +128,23 @@ async function save() {
 
 .error {
   margin-bottom: 16px;
+}
+
+.device-title {
+  margin: 28px 0 8px;
+  font-size: 1.15rem;
+}
+
+.device-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
 }
 </style>
