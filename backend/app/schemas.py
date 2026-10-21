@@ -385,6 +385,16 @@ class PurchaseOut(BalanceChange):
     session: RewardSessionOut | None = None
 
 
+class DaySummary(BaseModel):
+    """Итог дня: все суммы положительные, кроме manual (поправка может быть в обе стороны)."""
+
+    date: date
+    earned: int
+    spent: int
+    penalties: int
+    manual: int
+
+
 class ManualTransactionIn(BaseModel):
     amount: Annotated[int, Field(ge=-1_000_000, le=1_000_000)]
     note: Description | None = None

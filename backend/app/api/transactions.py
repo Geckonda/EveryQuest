@@ -1,4 +1,6 @@
+from datetime import datetime, time, timedelta
 from typing import Annotated
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import func, select
@@ -6,10 +8,12 @@ from sqlalchemy.orm import Session
 
 from app.db import DbSession
 from app.deps import CurrentUser
-from app.economy import InsufficientFunds, manual_adjust
+from app.economy import InsufficientFunds, manual_adjust, utcnow
 from app.models import Quest, Reward, Transaction
+from app.recurrence import local_today
 from app.schemas import (
     BalanceChange,
+    DaySummary,
     ManualTransactionIn,
     TransactionOut,
     TransactionPage,
@@ -56,6 +60,33 @@ def list_transactions(
         for transaction, title in rows
     ]
     return TransactionPage(items=items, total=total or 0)
+
+
+@router.get("/today")
+def today_summary(user: CurrentUser, db: DbSession) -> DaySummary:
+    """Итог текущего дня по часовому поясу пользователя: сколько заработано и потрачено."""
+    day = local_today(user.timezone, utcnow())
+    start = datetime.combine(day, time(), tzinfo=ZoneInfo(user.timezone))
+    # Следующая полночь — через combine, а не +24 ч: в день перехода на летнее время их 23 или 25.
+    end = datetime.combine(day + timedelta(days=1), time(), tzinfo=ZoneInfo(user.timezone))
+    sums = dict(
+        db.execute(
+            select(Transaction.type, func.sum(Transaction.amount))
+            .where(
+                Transaction.user_id == user.id,
+                Transaction.created_at >= start,
+                Transaction.created_at < end,
+            )
+            .group_by(Transaction.type)
+        ).all()
+    )
+    return DaySummary(
+        date=day,
+        earned=sums.get("quest_reward", 0),
+        spent=-sums.get("purchase", 0),
+        penalties=-sums.get("penalty", 0),
+        manual=sums.get("manual", 0),
+    )
 
 
 @router.post("/manual", status_code=status.HTTP_201_CREATED)

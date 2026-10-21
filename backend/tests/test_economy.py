@@ -1,4 +1,6 @@
 import threading
+from datetime import datetime, time, timedelta
+from zoneinfo import ZoneInfo
 
 import pytest
 from fastapi.testclient import TestClient
@@ -156,6 +158,42 @@ def test_transactions_history(client: TestClient, headers: dict[str, str]) -> No
 
     stranger = auth_headers(register(client, email="stranger@example.com"))
     assert client.get(f"{API}/transactions", headers=stranger).json() == {"items": [], "total": 0}
+
+
+def test_today_summary(client: TestClient, db: Session, headers: dict[str, str]) -> None:
+    client.patch(f"{API}/me", headers=headers, json={"timezone": "Asia/Tokyo"})
+    earn(client, headers, 100)
+    earn(client, headers, 20)
+    reward = create_reward(client, headers, 30)
+    client.post(f"{API}/rewards/{reward['id']}/purchase", headers=headers)
+    client.post(f"{API}/transactions/manual", headers=headers, json={"amount": -5})
+    tier_id = client.get(f"{API}/tiers", headers=headers).json()[0]["id"]
+    quest = client.post(
+        f"{API}/quests", headers=headers, json={"name": "Сдался", "tier_id": tier_id, "penalty": 7}
+    ).json()
+    client.post(f"{API}/quests/{quest['id']}/fail", headers=headers)
+
+    # Награда «вчера» по Токио — за минуту до местной полуночи — в итог дня не входит.
+    tokyo = ZoneInfo("Asia/Tokyo")
+    midnight = datetime.combine(datetime.now(tokyo).date(), time(), tzinfo=tokyo)
+    yesterday = db.scalars(
+        select(Transaction).where(Transaction.amount == 20, Transaction.type == "quest_reward")
+    ).one()
+    yesterday.created_at = midnight - timedelta(minutes=1)
+    db.flush()
+
+    summary = client.get(f"{API}/transactions/today", headers=headers).json()
+    assert summary == {
+        "date": midnight.date().isoformat(),
+        "earned": 100,
+        "spent": 30,
+        "penalties": 7,
+        "manual": -5,
+    }
+
+    stranger = auth_headers(register(client, email="stranger@example.com"))
+    empty = client.get(f"{API}/transactions/today", headers=stranger).json()
+    assert (empty["earned"], empty["spent"], empty["penalties"], empty["manual"]) == (0, 0, 0, 0)
 
 
 def test_balance_matches_transactions_sum(

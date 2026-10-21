@@ -178,6 +178,7 @@ REST под префиксом `/api/v1`. Все ресурсы, кроме auth
 | GET | `/reward-sessions/active` | Идущие траты |
 | POST | `/reward-sessions/{id}/finish` | Закончить трату раньше срока |
 | GET | `/transactions` | История с пагинацией |
+| GET | `/transactions/today` | Итог дня по часовому поясу пользователя |
 | POST | `/transactions/manual` | Ручная корректировка баланса |
 
 ## Этапы разработки
