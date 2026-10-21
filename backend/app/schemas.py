@@ -340,6 +340,28 @@ class RecurringQuestUpdate(PatchModel):
     is_archived: bool | None = None
 
 
+# --- календарь ---
+
+
+class ForecastQuest(BaseModel):
+    """Будущий экземпляр повторяющегося квеста: появится на доске в начале своего периода."""
+
+    recurring_quest_id: int
+    period_date: date
+    name: str
+    tier_id: int
+    category_id: int | None
+    reward: int
+    penalty: int
+    due_at: datetime
+
+
+class CalendarOut(BaseModel):
+    # Квесты со сроком в диапазоне — любого статуса.
+    quests: list[QuestOut]
+    forecast: list[ForecastQuest]
+
+
 # --- транзакции ---
 
 TransactionType = Literal["quest_reward", "penalty", "purchase", "manual"]

@@ -97,6 +97,22 @@ def period_for(schedule: Schedule, today: date) -> Period | None:
     return period if _in_range(schedule, period.period_date, period.due_date) else None
 
 
+def occurrences(schedule: Schedule, first: date, last: date) -> list[Period]:
+    """Периоды, срок которых попадает в [first, last] (местные даты), по порядку.
+
+    Многодневный период находится с любого своего дня — повторы отсекаем по period_date.
+    Период, начавшийся до first, но со сроком внутри диапазона, тоже попадает.
+    """
+    found: dict[date, Period] = {}
+    day = first
+    while day <= last:
+        period = period_for(schedule, day)
+        if period is not None and first <= period.due_date <= last:
+            found.setdefault(period.period_date, period)
+        day += timedelta(days=1)
+    return sorted(found.values(), key=lambda p: p.due_date)
+
+
 def due_at_for(schedule: Schedule, period: Period, timezone: str) -> datetime:
     """Срок экземпляра в UTC: due_time в последний день периода по времени пользователя."""
     local = datetime.combine(period.due_date, schedule.due_time, tzinfo=ZoneInfo(timezone))

@@ -3,7 +3,14 @@ from datetime import UTC, date, datetime, time, timedelta
 
 import pytest
 
-from app.recurrence import Period, due_at_for, local_today, next_due_at, period_for
+from app.recurrence import (
+    Period,
+    due_at_for,
+    local_today,
+    next_due_at,
+    occurrences,
+    period_for,
+)
 
 
 @dataclass
@@ -209,3 +216,55 @@ def test_next_due_yearly_via_monthly_interval() -> None:
     due = next_due_at(schedule, "UTC", datetime(2026, 10, 21, tzinfo=UTC))
     assert due is not None
     assert due.date() == date(2027, 1, 1)
+
+
+# --- occurrences (прогноз для календаря) ---
+
+
+def due_dates(schedule: S, first: date, last: date) -> list[date]:
+    return [p.due_date for p in occurrences(schedule, first, last)]
+
+
+def test_occurrences_daily_with_interval_and_end() -> None:
+    schedule = S("daily", interval=2, start_date=date(2026, 10, 1), end_date=date(2026, 10, 9))
+    assert due_dates(schedule, date(2026, 10, 4), date(2026, 10, 31)) == [
+        date(2026, 10, 5),
+        date(2026, 10, 7),
+        date(2026, 10, 9),
+    ]
+
+
+def test_occurrences_weekly_days() -> None:
+    schedule = S("weekly", days_of_week=[1, 5])  # пн и пт
+    assert due_dates(schedule, date(2026, 10, 19), date(2026, 10, 31)) == [
+        date(2026, 10, 19),
+        date(2026, 10, 23),
+        date(2026, 10, 26),
+        date(2026, 10, 30),
+    ]
+
+
+def test_occurrences_multiday_period_counted_once() -> None:
+    """Неделя без дней — один экземпляр со сроком в воскресенье, а не семь."""
+    schedule = S("weekly")
+    assert occurrences(schedule, date(2026, 10, 21), date(2026, 11, 3)) == [
+        Period(date(2026, 10, 19), date(2026, 10, 25)),  # начался до диапазона
+        Period(date(2026, 10, 26), date(2026, 11, 1)),
+    ]
+
+
+def test_occurrences_period_due_after_range_excluded() -> None:
+    # Месяц без числа: октябрьский срок 31-го — вне диапазона до 30-го.
+    assert due_dates(S("monthly"), date(2026, 10, 1), date(2026, 10, 30)) == []
+    assert due_dates(S("monthly"), date(2026, 10, 1), date(2026, 11, 30)) == [
+        date(2026, 10, 31),
+        date(2026, 11, 30),
+    ]
+
+
+def test_occurrences_last_day_of_month() -> None:
+    schedule = S("monthly", day_of_month=31)
+    assert due_dates(schedule, date(2027, 1, 15), date(2027, 3, 15)) == [
+        date(2027, 1, 31),
+        date(2027, 2, 28),
+    ]

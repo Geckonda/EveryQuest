@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from app.api import (
     auth,
+    calendar,
     categories,
     health,
     me,
@@ -23,4 +24,5 @@ api_router.include_router(rewards.router)
 api_router.include_router(reward_sessions.router)
 api_router.include_router(quests.router)
 api_router.include_router(recurring.router)
+api_router.include_router(calendar.router)
 api_router.include_router(transactions.router)
