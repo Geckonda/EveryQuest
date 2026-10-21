@@ -139,6 +139,23 @@ export type RecurringPayload = Pick<
   | 'end_date'
 >
 
+/** Будущий экземпляр повторяющегося квеста — ещё не на доске. */
+export interface ForecastQuest {
+  recurring_quest_id: number
+  period_date: string
+  name: string
+  tier_id: number
+  category_id: number | null
+  reward: number
+  penalty: number
+  due_at: string
+}
+
+export interface CalendarData {
+  quests: Quest[]
+  forecast: ForecastQuest[]
+}
+
 export type TransactionType = 'quest_reward' | 'penalty' | 'purchase' | 'manual'
 
 export interface Transaction {

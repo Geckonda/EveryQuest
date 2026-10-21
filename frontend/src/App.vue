@@ -29,6 +29,7 @@ const overrides = computed(() => (isDark.value ? darkOverrides : lightOverrides)
 const navItems = [
   { to: '/', label: 'Сегодня' },
   { to: '/quests', label: 'Квесты' },
+  { to: '/calendar', label: 'Календарь' },
   { to: '/rewards', label: 'Таверна' },
   { to: '/history', label: 'Летопись' },
   { to: '/settings', label: 'Настройки' },
