@@ -85,8 +85,9 @@ export const useCatalogStore = defineStore('catalog', () => {
     return reward
   }
 
-  async function purchase(rewardId: number) {
-    const result = await api.post<PurchaseResult>(`/rewards/${rewardId}/purchase`)
+  /** queue — трата со временем встаёт в очередь за идущими; false — стартует сразу. */
+  async function purchase(rewardId: number, queue = true) {
+    const result = await api.post<PurchaseResult>(`/rewards/${rewardId}/purchase?queue=${queue}`)
     auth.setBalance(result.balance, 'purchase')
     if (result.session) sessions.add(result.session)
     return result

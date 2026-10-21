@@ -5,8 +5,9 @@ import type { Reward } from '@/api/types'
 import { errorMessage } from '@/api/errors'
 import { useAuthStore } from '@/stores/auth'
 import { useCatalogStore } from '@/stores/catalog'
+import { useSessionsStore } from '@/stores/sessions'
 import { useArchiveToggle } from '@/composables/useArchiveToggle'
-import { coins } from '@/utils/format'
+import { coins, formatTime } from '@/utils/format'
 import { DEFAULT_REWARD_FILTERS, filterRewards } from '@/utils/rewardFilters'
 import { flyCoins, purseElement } from '@/utils/coinFx'
 import CatalogSection from '@/components/CatalogSection.vue'
@@ -15,6 +16,7 @@ import RewardFormModal from '@/components/RewardFormModal.vue'
 
 const auth = useAuthStore()
 const catalog = useCatalogStore()
+const sessions = useSessionsStore()
 const toggleArchive = useArchiveToggle()
 const dialog = useDialog()
 const message = useMessage()
@@ -54,24 +56,49 @@ function open(reward: Reward | null) {
 function buy(reward: Reward, event: MouseEvent) {
   // Запоминаем кнопку до диалога: к ней из кошелька полетят монеты.
   const button = event.currentTarget as Element | null
+  const afford = `«${reward.name}» за ${coins(reward.price)}. В кошеле останется ${coins(balance.value - reward.price)}.`
+
+  async function order(queue: boolean) {
+    buyingId.value = reward.id
+    try {
+      const { session } = await catalog.purchase(reward.id, queue)
+      flyCoins(purseElement(), button)
+      message.success(
+        session && new Date(session.started_at) > new Date()
+          ? `«${reward.name}» в очереди — начнётся в ${formatTime(session.started_at)}`
+          : `«${reward.name}» — ваше. Славного отдыха, путник!`,
+      )
+    } catch (e) {
+      message.error(errorMessage(e))
+      await auth.fetchMe().catch(() => {})
+    } finally {
+      buyingId.value = null
+    }
+  }
+
+  // У траты со временем, пока идёт другая, — выбор: в очередь или параллельно.
+  const busyUntil = reward.duration_minutes ? sessions.queueEnd() : null
+  if (busyUntil) {
+    dialog.info({
+      title: 'Заказать?',
+      content: `${afford} Сейчас уже идёт отдых — до ${formatTime(busyUntil)}. Начать «${reward.name}» после него или прямо сейчас, параллельно?`,
+      positiveText: `После, в ${formatTime(busyUntil)}`,
+      negativeText: 'Сейчас, параллельно',
+      // Цвет кнопки — основной темы, а не синий «информационный».
+      positiveButtonProps: { type: 'primary' },
+      onPositiveClick: () => order(true),
+      onNegativeClick: () => order(false),
+    })
+    return
+  }
+
   dialog.info({
     title: 'Заказать?',
-    content: `«${reward.name}» за ${coins(reward.price)}. В кошеле останется ${coins(balance.value - reward.price)}.`,
+    content: afford,
     positiveText: 'Заказать',
     negativeText: 'Отмена',
-    onPositiveClick: async () => {
-      buyingId.value = reward.id
-      try {
-        await catalog.purchase(reward.id)
-        flyCoins(purseElement(), button)
-        message.success(`«${reward.name}» — ваше. Славного отдыха, путник!`)
-      } catch (e) {
-        message.error(errorMessage(e))
-        await auth.fetchMe().catch(() => {})
-      } finally {
-        buyingId.value = null
-      }
-    },
+    positiveButtonProps: { type: 'primary' },
+    onPositiveClick: () => order(true),
   })
 }
 </script>

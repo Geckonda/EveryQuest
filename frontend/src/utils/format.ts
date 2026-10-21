@@ -113,6 +113,11 @@ export function countdown(createdAt: string, dueAt: string, now = new Date()): C
   return { left: text, urgency, remaining }
 }
 
+/** «16:20» — время в поясе браузера. */
+export function formatTime(iso: string): string {
+  return timeFormat.format(new Date(iso))
+}
+
 export function formatDateTime(iso: string): string {
   return dateTimeFormat.format(new Date(iso))
 }

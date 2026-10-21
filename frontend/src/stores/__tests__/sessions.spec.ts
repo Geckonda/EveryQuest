@@ -53,17 +53,49 @@ describe('sessions store', () => {
     expect(useSessionsStore().active).toEqual([])
   })
 
-  it('закончить раньше — запрос и удаление из списка', async () => {
+  it('закончить раньше — запрос и перечитывание сдвинутой очереди', async () => {
+    const shifted = { ...session(2, '2026-10-21T12:40:00Z'), started_at: '2026-10-21T12:10:00Z' }
     const fetchMock = vi
       .fn<typeof fetch>()
-      .mockResolvedValue(json(session(1, '2026-10-21T13:00:00Z')))
+      .mockResolvedValueOnce(json(session(1, '2026-10-21T12:15:00Z')))
+      .mockResolvedValueOnce(json([shifted]))
     vi.stubGlobal('fetch', fetchMock)
     const sessions = useSessionsStore()
-    sessions.add(session(1, '2026-10-21T13:00:00Z'))
+    sessions.add(session(1, '2026-10-21T12:15:00Z'))
 
     await sessions.finish(1)
 
     expect(String(fetchMock.mock.calls[0]?.[0])).toMatch(/\/reward-sessions\/1\/finish$/)
-    expect(sessions.active).toEqual([])
+    expect(String(fetchMock.mock.calls[1]?.[0])).toMatch(/\/reward-sessions\/active$/)
+    expect(sessions.active).toEqual([shifted])
+  })
+
+  it('покупка передаёт выбор: в очередь или параллельно', async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      // Новый Response на каждый вызов: тело ответа читается только один раз.
+      .mockImplementation(async () => json({ transaction: {}, balance: 80, session: null }))
+    vi.stubGlobal('fetch', fetchMock)
+    useAuthStore().user = { id: 1, balance: 100 } as User
+
+    await useCatalogStore().purchase(5)
+    await useCatalogStore().purchase(5, false)
+
+    expect(String(fetchMock.mock.calls[0]?.[0])).toMatch(/\/rewards\/5\/purchase\?queue=true$/)
+    expect(String(fetchMock.mock.calls[1]?.[0])).toMatch(/queue=false$/)
+  })
+
+  it('конец очереди — самое позднее окончание, пустая или истёкшая — null', () => {
+    const sessions = useSessionsStore()
+    const now = new Date('2026-10-21T12:05:00Z')
+    expect(sessions.queueEnd(now)).toBeNull()
+
+    sessions.add(session(1, '2026-10-21T12:45:00Z'))
+    sessions.add({ ...session(2, '2026-10-21T12:20:00.500Z'), started_at: '2026-10-21T12:05:00Z' })
+    expect(sessions.queueEnd(now)).toBe('2026-10-21T12:45:00Z')
+    // Сортировка по началу: первая начавшаяся — первая.
+    expect(sessions.active.map((s) => s.id)).toEqual([1, 2])
+
+    expect(sessions.queueEnd(new Date('2026-10-21T13:00:00Z'))).toBeNull()
   })
 })

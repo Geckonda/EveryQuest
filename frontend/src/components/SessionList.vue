@@ -4,7 +4,7 @@ import { NButton, useMessage } from 'naive-ui'
 import { errorMessage } from '@/api/errors'
 import { useNow } from '@/composables/useNow'
 import { useSessionsStore } from '@/stores/sessions'
-import { countdown } from '@/utils/format'
+import { countdown, formatTime } from '@/utils/format'
 
 /** Идущие траты с полосками и кнопкой «Закончить раньше» — в шапке и на «Сегодня». */
 withDefaults(defineProps<{ size?: 'small' | 'large' }>(), { size: 'small' })
@@ -16,16 +16,24 @@ const message = useMessage()
 const now = useNow(() => sessions.active.length > 0)
 
 const rows = computed(() =>
-  sessions.active.map((s) => ({ ...s, timer: countdown(s.started_at, s.ends_at, now.value) })),
+  sessions.active.map((s) => ({
+    ...s,
+    // Ждёт в очереди: отсчёт ещё не идёт.
+    waiting: new Date(s.started_at) > now.value,
+    timer: countdown(s.started_at, s.ends_at, now.value),
+    minutes: Math.round((new Date(s.ends_at).getTime() - new Date(s.started_at).getTime()) / 60000),
+  })),
 )
 
 const finishingId = ref<number | null>(null)
 
-async function finish(id: number, name: string) {
+async function finish(id: number, name: string, waiting: boolean) {
   finishingId.value = id
   try {
     await sessions.finish(id)
-    message.success(`«${name}» — закончили раньше. Похвально!`)
+    message.success(
+      waiting ? `Убрали «${name}» из очереди` : `«${name}» — закончили раньше. Похвально!`,
+    )
   } catch (e) {
     message.error(errorMessage(e))
     await sessions.load().catch(() => {})
@@ -37,19 +45,24 @@ async function finish(id: number, name: string) {
 
 <template>
   <ul class="list" :class="size">
-    <li v-for="row in rows" :key="row.id">
+    <li v-for="row in rows" :key="row.id" :class="{ waiting: row.waiting }">
       <div class="row-head">
         <span class="row-name">{{ row.name }}</span>
-        <span class="num row-left">{{ row.timer.left }}</span>
+        <span v-if="row.waiting" class="row-queue">
+          в очереди · с {{ formatTime(row.started_at) }}, {{ row.minutes }} мин
+        </span>
+        <span v-else class="num row-left">{{ row.timer.left }}</span>
       </div>
-      <div class="bar" :style="{ '--remaining': row.timer.remaining }"><span /></div>
+      <div class="bar" :style="{ '--remaining': row.waiting ? 1 : row.timer.remaining }">
+        <span />
+      </div>
       <NButton
         :size="size === 'large' ? 'small' : 'tiny'"
         quaternary
         :loading="finishingId === row.id"
-        @click="finish(row.id, row.name)"
+        @click="finish(row.id, row.name, row.waiting)"
       >
-        Закончить раньше
+        {{ row.waiting ? 'Убрать из очереди' : 'Закончить раньше' }}
       </NButton>
     </li>
   </ul>
@@ -90,6 +103,25 @@ async function finish(id: number, name: string) {
 
 .row-left {
   color: var(--color-gold);
+}
+
+.row-queue {
+  color: var(--color-muted);
+  font-family: var(--font-body);
+  font-size: 0.875rem;
+  font-style: italic;
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+/* Ожидающая в очереди — бледнее, полоска ещё не тает. */
+.waiting .bar span {
+  background: var(--color-rule);
+  opacity: 0.6;
+}
+
+.waiting .row-name {
+  color: var(--color-muted);
 }
 
 .bar {
