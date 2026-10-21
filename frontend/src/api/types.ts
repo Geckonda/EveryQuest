@@ -163,6 +163,22 @@ export interface BalanceChange {
   balance: number
 }
 
+/** Идущая трата с длительностью: «ТикТок на 20 минут». */
+export interface RewardSession {
+  id: number
+  reward_id: number
+  /** Название на момент заказа. */
+  name: string
+  started_at: string
+  ends_at: string
+  /** Закончили раньше срока. */
+  finished_at: string | null
+}
+
+export interface PurchaseResult extends BalanceChange {
+  session: RewardSession | null
+}
+
 export interface ArchiveBlocker {
   id: number
   name: string

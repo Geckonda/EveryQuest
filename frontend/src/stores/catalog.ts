@@ -2,15 +2,16 @@ import { computed, ref, type Ref } from 'vue'
 import { defineStore } from 'pinia'
 import { api } from '@/api/client'
 import type {
-  BalanceChange,
   Category,
   CategoryPayload,
+  PurchaseResult,
   Reward,
   RewardPayload,
   Tier,
   TierPayload,
 } from '@/api/types'
 import { useAuthStore } from './auth'
+import { useSessionsStore } from './sessions'
 
 type Comparator<T> = (a: T, b: T) => number
 
@@ -25,6 +26,7 @@ function upsert<T extends { id: number }>(list: Ref<T[]>, item: T, compare: Comp
 /** Тиры, категории и траты пользователя — вместе с архивными; фильтруют страницы. */
 export const useCatalogStore = defineStore('catalog', () => {
   const auth = useAuthStore()
+  const sessions = useSessionsStore()
 
   const tiers = ref<Tier[]>([])
   const categories = ref<Category[]>([])
@@ -84,8 +86,9 @@ export const useCatalogStore = defineStore('catalog', () => {
   }
 
   async function purchase(rewardId: number) {
-    const result = await api.post<BalanceChange>(`/rewards/${rewardId}/purchase`)
+    const result = await api.post<PurchaseResult>(`/rewards/${rewardId}/purchase`)
     auth.setBalance(result.balance, 'purchase')
+    if (result.session) sessions.add(result.session)
     return result
   }
 

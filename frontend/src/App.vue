@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted } from 'vue'
+import { computed, onMounted, onUnmounted, watch } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import {
   NButton,
@@ -14,8 +14,11 @@ import {
 import { useAuthStore } from '@/stores/auth'
 import { darkOverrides, lightOverrides } from '@/theme'
 import PurseBadge from '@/components/PurseBadge.vue'
+import SessionTimer from '@/components/SessionTimer.vue'
+import { useSessionsStore } from '@/stores/sessions'
 
 const auth = useAuthStore()
+const sessions = useSessionsStore()
 const route = useRoute()
 const router = useRouter()
 const osTheme = useOsTheme()
@@ -35,9 +38,21 @@ function logout() {
   router.push({ name: 'login' })
 }
 
-// Вернулись во вкладку — баланс мог измениться (штрафы, другое устройство).
+// Идущие траты — сразу после входа: таймер в шапке виден на любой странице.
+watch(
+  () => auth.user?.id,
+  (id) => {
+    if (id) sessions.load().catch(() => {})
+  },
+  { immediate: true },
+)
+
+// Вернулись во вкладку — баланс мог измениться (штрафы, другое устройство),
+// а трату могли заказать или закончить на телефоне.
 function onVisibilityChange() {
-  if (document.visibilityState === 'visible' && auth.user) auth.fetchMe().catch(() => {})
+  if (document.visibilityState !== 'visible' || !auth.user) return
+  auth.fetchMe().catch(() => {})
+  sessions.load().catch(() => {})
 }
 onMounted(() => document.addEventListener('visibilitychange', onVisibilityChange))
 onUnmounted(() => document.removeEventListener('visibilitychange', onVisibilityChange))
@@ -77,6 +92,7 @@ onUnmounted(() => document.removeEventListener('visibilitychange', onVisibilityC
               Ежеквестик
             </RouterLink>
             <div v-if="auth.user" class="account">
+              <SessionTimer />
               <PurseBadge :balance="auth.user.balance" />
               <span class="username">{{ auth.user.username }}</span>
               <NButton size="small" quaternary class="leave" @click="logout">Уйти</NButton>

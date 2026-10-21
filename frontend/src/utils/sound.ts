@@ -1,7 +1,7 @@
 import { ref, watch } from 'vue'
 
-/** reward — награда, purchase — заказ в таверне, penalty — штраф. */
-export type SoundKind = 'reward' | 'purchase' | 'penalty'
+/** reward — награда, purchase — заказ в таверне, penalty — штраф, timeUp — время траты вышло. */
+export type SoundKind = 'reward' | 'purchase' | 'penalty' | 'timeUp'
 
 const STORAGE_KEY = 'eq.sound'
 
@@ -93,6 +93,13 @@ export function playSound(kind: SoundKind): void {
       // Глухой удар и тон вниз — «взыскано».
       tone(ctx, master, 196, t, 0.45, { type: 'triangle', volume: 0.9, slideTo: 98 })
       tone(ctx, master, 784, t, 0.12, { volume: 0.25, slideTo: 392 })
+      break
+    case 'timeUp':
+      // Колокольчик трактирщика: три удара — «время вышло».
+      for (let i = 0; i < 3; i++) {
+        tone(ctx, master, 988, t + i * 0.32, 0.6, { volume: 0.9 })
+        tone(ctx, master, 988 * 2.4, t + i * 0.32, 0.3, { volume: 0.3 })
+      }
       break
   }
 }
