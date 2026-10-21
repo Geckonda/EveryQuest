@@ -47,6 +47,11 @@ services:
 
   # Фоновые задачи: штрафы за просрочку, повторяющиеся квесты, уборка сессий.
   worker:
+    # Тот же образ, что у backend. build — чтобы compose не пытался скачать
+    # everyquest-backend из реестра, если worker создаётся раньше сборки backend.
+    build:
+      context: ./backend
+      target: prod
     image: everyquest-backend
     restart: unless-stopped
     command: python -m app.worker

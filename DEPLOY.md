@@ -53,6 +53,17 @@ chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
 docker compose version
 ```
 
+**Docker Hub недоступен** (`TLS handshake timeout` при скачивании образов — из России бывает
+часто). Подключить зеркало — те же официальные образы, другой адрес:
+
+```sh
+cat /etc/docker/daemon.json 2>/dev/null   # если файл есть и не пустой — добавьте ключ вручную
+echo '{ "registry-mirrors": ["https://mirror.gcr.io", "https://dockerhub.timeweb.cloud"] }' > /etc/docker/daemon.json
+systemctl reload docker                    # reload, а не restart: запущенные контейнеры не трогает
+docker info | grep -A2 'Registry Mirrors'
+docker pull postgres:17-alpine             # проверка
+```
+
 ## 2. Освободить порты 80 и 443
 
 Посмотреть, что запущено:
@@ -87,6 +98,12 @@ ufw allow 80/tcp && ufw allow 443/tcp && ufw allow 443/udp
 
 ## 3. Код
 
+Если `git: command not found`:
+
+```sh
+apt update && apt install -y git
+```
+
 ```sh
 git clone https://github.com/Geckonda/EveryQuest.git /opt/everyquest
 cd /opt/everyquest
@@ -106,8 +123,7 @@ cat .env
 ```
 
 `DOMAIN` уже указан: `94-232-42-149.sslip.io` — этот адрес без всякой регистрации указывает
-на IP сервера, и Let's Encrypt выдаёт для него сертификат. Появится свой домен — направьте его
-A-запись на `94.232.42.149`, поменяйте `DOMAIN` в `.env` и выполните шаг 5 ещё раз.
+на IP сервера, и Let's Encrypt выдаёт для него сертификат. Свой домен — см. «Смена домена» ниже.
 
 `.env` хранит пароли — он только на сервере, в git не попадает. Пароль базы менять после
 первого запуска нельзя: база уже создана со старым.
@@ -144,6 +160,27 @@ docker compose -f docker-compose.prod.yml up -d --build
 ```
 
 Миграции базы применяются сами при старте API.
+
+## Смена домена
+
+Пример — переход с `sslip.io` на `quest.dotnetdon.ru`. DNS домена `dotnetdon.ru` — в Cloudflare.
+
+1. В Cloudflare: **DNS → Records → Add record** — `A`, имя `quest`, адрес `94.232.42.149`,
+   **Proxy status: DNS only** (серое облачко). С оранжевым трафик пошёл бы через Cloudflare:
+   приложение видело бы его адреса вместо адресов людей (лимит попыток входа стал бы общим
+   для всех), и HTTPS пришлось бы настраивать иначе.
+2. На сервере, когда запись дошла:
+
+   ```sh
+   getent hosts quest.dotnetdon.ru     # 94.232.42.149
+   cd /opt/everyquest
+   sed -i "s|^DOMAIN=.*|DOMAIN=quest.dotnetdon.ru|" .env
+   docker compose -f docker-compose.prod.yml up -d web
+   docker compose -f docker-compose.prod.yml logs web | tail -20   # certificate obtained successfully
+   ```
+
+Данные остаются в той же базе. Войти придётся заново: cookie входа привязана к адресу сайта.
+Старый адрес после смены перестаёт открываться.
 
 ## Бэкапы
 
