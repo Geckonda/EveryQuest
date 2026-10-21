@@ -13,6 +13,7 @@ import {
 } from 'naive-ui'
 import { useAuthStore } from '@/stores/auth'
 import { darkOverrides, lightOverrides } from '@/theme'
+import AppIcon, { type IconName } from '@/components/AppIcon.vue'
 import PurseBadge from '@/components/PurseBadge.vue'
 import SessionTimer from '@/components/SessionTimer.vue'
 import { useSessionsStore } from '@/stores/sessions'
@@ -26,13 +27,13 @@ const isDark = computed(() => osTheme.value === 'dark')
 const theme = computed(() => (isDark.value ? darkTheme : null))
 const overrides = computed(() => (isDark.value ? darkOverrides : lightOverrides))
 
-const navItems = [
-  { to: '/', label: 'Сегодня' },
-  { to: '/quests', label: 'Квесты' },
-  { to: '/calendar', label: 'Календарь' },
-  { to: '/rewards', label: 'Таверна' },
-  { to: '/history', label: 'Летопись' },
-  { to: '/settings', label: 'Настройки' },
+const navItems: { to: string; label: string; icon: IconName }[] = [
+  { to: '/', label: 'Сегодня', icon: 'today' },
+  { to: '/quests', label: 'Квесты', icon: 'quests' },
+  { to: '/calendar', label: 'Календарь', icon: 'calendar' },
+  { to: '/rewards', label: 'Таверна', icon: 'tavern' },
+  { to: '/history', label: 'Летопись', icon: 'chronicle' },
+  { to: '/settings', label: 'Настройки', icon: 'settings' },
 ]
 
 function logout() {
@@ -73,24 +74,7 @@ onUnmounted(() => document.removeEventListener('visibilitychange', onVisibilityC
         <header class="sign">
           <div class="sign-row">
             <RouterLink to="/" class="logo">
-              <svg class="emblem" viewBox="0 0 24 24" aria-hidden="true">
-                <!-- Кружка эля -->
-                <path
-                  d="M5 6h10v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2zM15 9h2.5a2.5 2.5 0 0 1 0 5H15"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.6"
-                  stroke-linejoin="round"
-                />
-                <path
-                  d="M4.5 6.5c0-2 1.6-3 3-2.5 0.6-1.4 2.6-1.8 3.6-0.6 1.2-0.8 3.6-0.2 3.6 1.9"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.6"
-                  stroke-linecap="round"
-                />
-                <path d="M8.5 10v6M11.5 10v6" stroke="currentColor" stroke-width="1.2" />
-              </svg>
+              <AppIcon name="tavern" :size="26" />
               Ежеквестик
             </RouterLink>
             <div v-if="auth.user" class="account">
@@ -106,11 +90,18 @@ onUnmounted(() => document.removeEventListener('visibilitychange', onVisibilityC
             </RouterLink>
           </nav>
         </header>
-        <main>
+        <main :class="{ 'with-tabs': auth.user }">
           <div :class="route.meta.guestOnly ? 'guest' : 'page'">
             <RouterView />
           </div>
         </main>
+        <!-- На телефоне меню — панель вкладок внизу, под большим пальцем. -->
+        <nav v-if="auth.user" class="tab-bar" aria-label="Разделы">
+          <RouterLink v-for="item in navItems" :key="item.to" :to="item.to" class="tab">
+            <AppIcon :name="item.icon" :size="22" />
+            <span>{{ item.label }}</span>
+          </RouterLink>
+        </nav>
       </NDialogProvider>
     </NMessageProvider>
   </NConfigProvider>
@@ -151,11 +142,6 @@ onUnmounted(() => document.removeEventListener('visibilitychange', onVisibilityC
   text-decoration: none;
   text-shadow: 0 1px 0 #000;
   white-space: nowrap;
-}
-
-.emblem {
-  width: 26px;
-  height: 26px;
 }
 
 .account {
@@ -240,6 +226,72 @@ main {
 
   .page {
     padding: 16px 14px 24px;
+  }
+}
+
+/* Панель вкладок — та же деревянная вывеска, только внизу. */
+.tab-bar {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .sign-nav {
+    display: none;
+  }
+
+  .sign-row {
+    padding-bottom: 10px;
+  }
+
+  /* Место под панель, чтобы она не закрывала конец страницы. */
+  main.with-tabs {
+    padding-bottom: calc(var(--tab-bar-height) + 24px + env(safe-area-inset-bottom));
+  }
+
+  .tab-bar {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 10;
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    height: calc(var(--tab-bar-height) + env(safe-area-inset-bottom));
+    padding-bottom: env(safe-area-inset-bottom);
+    background:
+      repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.12) 0 1px, transparent 1px 7px),
+      linear-gradient(0deg, #4a311b, var(--color-sign));
+    border-top: 3px solid #1d130a;
+    box-shadow: 0 -3px 10px rgba(0, 0, 0, 0.35);
+  }
+
+  .tab {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    min-width: 0;
+    color: var(--color-sign-muted);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    text-decoration: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .tab span {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .tab.router-link-exact-active {
+    color: var(--color-sign-gold);
+  }
+
+  .tab.router-link-exact-active .icon {
+    filter: drop-shadow(0 0 4px rgba(231, 178, 79, 0.6));
   }
 }
 </style>

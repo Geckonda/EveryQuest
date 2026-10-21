@@ -202,3 +202,15 @@ a {
   text-decoration: underline dotted;
   cursor: pointer;
 }
+
+/* Высота нижней панели вкладок на телефоне (App.vue). */
+:root {
+  --tab-bar-height: 58px;
+}
+
+/* Сообщения внизу экрана — над панелью вкладок, а не под ней. */
+@media (max-width: 640px) {
+  .n-message-container.n-message-container--bottom {
+    bottom: calc(var(--tab-bar-height) + 8px + env(safe-area-inset-bottom)) !important;
+  }
+}
