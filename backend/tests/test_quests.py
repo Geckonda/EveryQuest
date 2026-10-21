@@ -183,6 +183,47 @@ def test_list_filters_and_order(
     assert client.get(f"{API}/quests?status=nope", headers=headers).status_code == 422
 
 
+def test_list_archive_pages(
+    client: TestClient, db: Session, headers: dict[str, str], tiers: list[dict]
+) -> None:
+    """Архив: несколько статусов сразу, свежезакрытые сверху, постранично."""
+    done = create_quest(client, headers, name="Сдан", tier_id=tiers[0]["id"])
+    failed = create_quest(client, headers, name="Провален", tier_id=tiers[0]["id"])
+    removed = create_quest(client, headers, name="Снят", tier_id=tiers[0]["id"])
+    create_quest(client, headers, name="Висит", tier_id=tiers[0]["id"])
+    client.post(f"{API}/quests/{done['id']}/complete", headers=headers)
+    client.post(f"{API}/quests/{failed['id']}/fail", headers=headers)
+    client.patch(f"{API}/quests/{removed['id']}", headers=headers, json={"status": "archived"})
+    # Сданный закрыт позже всех — должен быть первым, хотя создан раньше.
+    db.get(Quest, done["id"]).closed_at = datetime.now(UTC) + timedelta(minutes=1)
+    db.flush()
+
+    url = f"{API}/quests?status=completed&status=failed&status=archived"
+    first = client.get(f"{url}&limit=2", headers=headers).json()
+    second = client.get(f"{url}&limit=2&offset=2", headers=headers).json()
+    assert [q["id"] for q in first] == [done["id"], removed["id"]]
+    assert [q["id"] for q in second] == [failed["id"]]
+
+
+def test_active_list_is_not_capped(
+    client: TestClient, db: Session, headers: dict[str, str], tiers: list[dict]
+) -> None:
+    db.add_all(
+        Quest(
+            user_id=client.get(f"{API}/me", headers=headers).json()["id"],
+            tier_id=tiers[0]["id"],
+            name=f"Квест {i}",
+            reward=1,
+            penalty=1,
+        )
+        for i in range(120)
+    )
+    db.flush()
+
+    assert len(client.get(f"{API}/quests?status=active", headers=headers).json()) == 120
+    assert len(client.get(f"{API}/quests", headers=headers).json()) == 100
+
+
 # --- изменение ---
 
 

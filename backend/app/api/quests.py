@@ -35,24 +35,31 @@ def _ensure_active(quest: Quest) -> None:
 def list_quests(
     user: CurrentUser,
     db: DbSession,
-    status_: Annotated[QuestStatus | None, Query(alias="status")] = None,
+    # Можно несколько: ?status=completed&status=failed — архив одним запросом.
+    statuses: Annotated[list[QuestStatus] | None, Query(alias="status")] = None,
     category_id: int | None = None,
     tier_id: int | None = None,
-    limit: Annotated[int, Query(ge=1, le=500)] = 100,
+    # Не задан: активные — все (доска фильтруется на клиенте), остальные — 100.
+    limit: Annotated[int | None, Query(ge=1, le=500)] = None,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> list[QuestOut]:
     query = select(Quest).where(Quest.user_id == user.id)
-    if status_ is not None:
-        query = query.where(Quest.status == status_)
+    if statuses:
+        query = query.where(Quest.status.in_(statuses))
     if category_id is not None:
         query = query.where(Quest.category_id == category_id)
     if tier_id is not None:
         query = query.where(Quest.tier_id == tier_id)
-    if status_ == "active":
+
+    only_active = statuses == ["active"]
+    if only_active:
         # Сначала горящие; без срока — в конце.
         query = query.order_by(Quest.due_at.asc().nulls_last(), Quest.id)
     else:
-        query = query.order_by(Quest.id.desc())
+        # Свежезакрытые сверху; активные (closed_at пуст) — после них.
+        query = query.order_by(Quest.closed_at.desc().nulls_last(), Quest.id.desc())
+    if limit is None and not only_active:
+        limit = 100
     quests = db.scalars(query.limit(limit).offset(offset))
     return [QuestOut.model_validate(quest) for quest in quests]
 
