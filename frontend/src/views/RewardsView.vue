@@ -1,12 +1,13 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import { NAlert, NButton, NSpin, useDialog, useMessage } from 'naive-ui'
+import { computed, onMounted, reactive, ref } from 'vue'
+import { NAlert, NButton, NCheckbox, NInput, NSelect, NSpin, useDialog, useMessage } from 'naive-ui'
 import type { Reward } from '@/api/types'
 import { errorMessage } from '@/api/errors'
 import { useAuthStore } from '@/stores/auth'
 import { useCatalogStore } from '@/stores/catalog'
 import { useArchiveToggle } from '@/composables/useArchiveToggle'
 import { coins } from '@/utils/format'
+import { DEFAULT_REWARD_FILTERS, filterRewards } from '@/utils/rewardFilters'
 import CatalogSection from '@/components/CatalogSection.vue'
 import CoinIcon from '@/components/CoinIcon.vue'
 import RewardFormModal from '@/components/RewardFormModal.vue'
@@ -23,6 +24,16 @@ const loading = ref(true)
 const loadError = ref<string | null>(null)
 const modal = ref(false)
 const edited = ref<Reward | null>(null)
+
+const filters = reactive({ ...DEFAULT_REWARD_FILTERS })
+const visible = computed(() => filterRewards(catalog.rewards, filters, balance.value))
+const filtering = computed(() => filters.q.trim() !== '' || filters.onlyAffordable)
+const sortOptions = [
+  { label: 'Как в меню', value: 'menu' },
+  { label: 'Сначала дешёвые', value: 'cheap' },
+  { label: 'Сначала дорогие', value: 'expensive' },
+  { label: 'По названию', value: 'name' },
+]
 
 onMounted(async () => {
   try {
@@ -68,9 +79,13 @@ function buy(reward: Reward) {
   <NAlert v-if="loadError" type="error">{{ loadError }}</NAlert>
   <NSpin v-else :show="loading">
     <CatalogSection
-      :items="catalog.rewards"
+      :items="visible"
       add-label="Добавить в меню"
-      empty-text="Меню пустует. Впишите то, ради чего стоит браться за квесты"
+      :empty-text="
+        filtering
+          ? 'Ничего не нашлось — попробуйте другой запрос'
+          : 'Меню пустует. Впишите то, ради чего стоит браться за квесты'
+      "
       @add="open(null)"
       @edit="open"
       @toggle-archive="
@@ -78,6 +93,19 @@ function buy(reward: Reward) {
           toggleArchive(reward, (is_archived) => catalog.saveReward(reward.id, { is_archived }))
       "
     >
+      <template v-if="catalog.rewards.length" #toolbar>
+        <div class="tools">
+          <NInput
+            v-model:value="filters.q"
+            clearable
+            size="small"
+            placeholder="Поиск по меню"
+            class="search"
+          />
+          <NSelect v-model:value="filters.sort" :options="sortOptions" size="small" class="sort" />
+          <NCheckbox v-model:checked="filters.onlyAffordable">По карману</NCheckbox>
+        </div>
+      </template>
       <template #item="{ item: reward }">
         <!-- Строка меню: название ········ цена -->
         <div class="line">
@@ -112,6 +140,22 @@ function buy(reward: Reward) {
 </template>
 
 <style scoped>
+.tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-bottom: 4px;
+}
+
+.search {
+  flex: 1 1 200px;
+}
+
+.sort {
+  width: 170px;
+}
+
 /* Длинное название не влезает — точки и цена переносятся на следующую строку. */
 .line {
   display: flex;

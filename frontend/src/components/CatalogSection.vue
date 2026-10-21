@@ -18,6 +18,8 @@ defineSlots<{
   item(props: { item: T }): unknown
   /** Дополнительные кнопки для неархивного элемента (например, «Купить»). */
   actions?(props: { item: T }): unknown
+  /** Поиск, сортировка — под кнопкой «Добавить». */
+  toolbar?(): unknown
 }>()
 
 const showArchived = ref(false)
@@ -36,6 +38,7 @@ const visible = computed(() =>
         Архив ({{ archivedCount }})
       </label>
     </div>
+    <slot name="toolbar" />
 
     <NEmpty v-if="!visible.length" :description="emptyText" class="empty" />
     <ul v-else class="list">
