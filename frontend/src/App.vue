@@ -15,6 +15,7 @@ import { darkOverrides, lightOverrides } from '@/theme'
 import { useTheme } from '@/composables/useTheme'
 import { TOUR_STEPS, useTour } from '@/composables/useTour'
 import GuidedTour from '@/components/GuidedTour.vue'
+import UpdatePrompt from '@/components/UpdatePrompt.vue'
 import AppIcon, { type IconName } from '@/components/AppIcon.vue'
 import PurseBadge from '@/components/PurseBadge.vue'
 import SessionTimer from '@/components/SessionTimer.vue'
@@ -133,6 +134,7 @@ onUnmounted(() => document.removeEventListener('visibilitychange', onVisibilityC
           </RouterLink>
         </nav>
         <GuidedTour v-if="auth.user" v-model:open="tour.open.value" :steps="TOUR_STEPS" />
+        <UpdatePrompt />
       </NDialogProvider>
     </NMessageProvider>
   </NConfigProvider>
@@ -144,6 +146,8 @@ onUnmounted(() => document.removeEventListener('visibilitychange', onVisibilityC
   position: sticky;
   top: 0;
   z-index: 10;
+  /* Установленное приложение на iPhone — полный экран: не заезжать под строку состояния. */
+  padding-top: env(safe-area-inset-top);
   color: var(--color-sign-text);
   background:
     repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.12) 0 1px, transparent 1px 7px),

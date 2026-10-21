@@ -13,6 +13,8 @@ import App from './App.vue'
 import router from './router'
 import { setAuthHandler } from './api/client'
 import { useAuthStore } from './stores/auth'
+// Слушает beforeinstallprompt с самого старта: событие приходит один раз и рано.
+import './composables/useInstall'
 
 const app = createApp(App)
 

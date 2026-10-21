@@ -22,6 +22,7 @@ import { playSound, soundEnabled } from '@/utils/sound'
 import { useTheme } from '@/composables/useTheme'
 import DeviceList from './DeviceList.vue'
 import { useTour } from '@/composables/useTour'
+import { useInstall } from '@/composables/useInstall'
 import HelpHint from './HelpHint.vue'
 
 const auth = useAuthStore()
@@ -60,6 +61,11 @@ const example = computed(() => (form.multiplier === null ? null : penaltyFor(50,
 const isComplete = computed(() => form.username.trim() !== '' && form.multiplier !== null)
 
 const tour = useTour()
+const { canInstall, isStandalone, isIos, install } = useInstall()
+
+async function installApp() {
+  if (await install()) message.success('Ежеквестик установлен — ищите кружку на главном экране')
+}
 
 /** Обзор показывает разделы на главной — туда и переходим. */
 async function replayTour() {
@@ -167,6 +173,18 @@ async function save() {
     <div class="device-row">
       <NButton size="small" secondary @click="replayTour">Показать обзор возможностей</NButton>
     </div>
+    <div class="device-row">
+      <span v-if="isStandalone" class="install-note">Открыто как приложение ✓</span>
+      <NButton v-else-if="canInstall" size="small" type="primary" secondary @click="installApp">
+        Установить приложение
+      </NButton>
+      <span v-else-if="isIos" class="install-note">
+        Установить на iPhone: в Safari «Поделиться» → «На экран „Домой“»
+      </span>
+      <span v-else class="install-note">
+        Установить: меню браузера → «Установить приложение» или «Добавить на главный экран»
+      </span>
+    </div>
 
     <h3 class="device-title">Безопасность</h3>
     <DeviceList />
@@ -210,6 +228,12 @@ async function save() {
 
 .device-row + .device-row {
   margin-top: 12px;
+}
+
+.install-note {
+  color: var(--color-muted);
+  font-size: 0.875rem;
+  font-style: italic;
 }
 
 .device-label {

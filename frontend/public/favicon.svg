@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="wood" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5a3b20"/>
+      <stop offset="1" stop-color="#2b1d10"/>
+    </linearGradient>
+    <pattern id="planks" width="512" height="64" patternUnits="userSpaceOnUse">
+      <rect width="512" height="2" y="62" fill="rgba(0,0,0,0.18)"/>
+    </pattern>
+    <radialGradient id="glow" cx="0.5" cy="0.42" r="0.5">
+      <stop offset="0" stop-color="rgba(255,190,90,0.28)"/>
+      <stop offset="1" stop-color="rgba(255,190,90,0)"/>
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" rx="96" fill="url(#wood)"/>
+  <rect width="512" height="512" rx="96" fill="url(#planks)"/>
+  <rect width="512" height="512" rx="96" fill="url(#glow)"/>
+  <rect x="6" y="6" width="500" height="500" rx="90" fill="none" stroke="#1d130a" stroke-width="10"/>
+  <g transform="translate(66.56 66.56) scale(15.786666666666667) translate(0.9 0.2)">
+  <path d="M5 7h10v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2z" fill="#3a2614" stroke="#e7b24f" stroke-width="1.5" stroke-linejoin="round"/>
+  <path d="M15 10h2.5a2.5 2.5 0 0 1 0 5H15" fill="none" stroke="#e7b24f" stroke-width="1.5" stroke-linejoin="round"/>
+  <path d="M4.5 7.5c0-2 1.6-3 3-2.5.6-1.4 2.6-1.8 3.6-.6 1.2-.8 3.6-.2 3.6 1.9" fill="#f6e7c1" stroke="#e7b24f" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M8.5 11v5M11.5 11v5" stroke="#e7b24f" stroke-width="1.2" stroke-linecap="round"/></g>
+</svg>
