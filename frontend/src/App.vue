@@ -9,10 +9,10 @@ import {
   darkTheme,
   dateRuRU,
   ruRU,
-  useOsTheme,
 } from 'naive-ui'
 import { useAuthStore } from '@/stores/auth'
 import { darkOverrides, lightOverrides } from '@/theme'
+import { useTheme } from '@/composables/useTheme'
 import AppIcon, { type IconName } from '@/components/AppIcon.vue'
 import PurseBadge from '@/components/PurseBadge.vue'
 import SessionTimer from '@/components/SessionTimer.vue'
@@ -22,8 +22,7 @@ const auth = useAuthStore()
 const sessions = useSessionsStore()
 const route = useRoute()
 const router = useRouter()
-const osTheme = useOsTheme()
-const isDark = computed(() => osTheme.value === 'dark')
+const { isDark } = useTheme()
 const theme = computed(() => (isDark.value ? darkTheme : null))
 const overrides = computed(() => (isDark.value ? darkOverrides : lightOverrides))
 

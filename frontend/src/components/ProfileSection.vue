@@ -7,6 +7,8 @@ import {
   NFormItem,
   NInput,
   NInputNumber,
+  NRadioButton,
+  NRadioGroup,
   NSelect,
   NSwitch,
   useMessage,
@@ -15,8 +17,10 @@ import { errorMessage } from '@/api/errors'
 import { useAuthStore } from '@/stores/auth'
 import { penaltyFor } from '@/utils/penalty'
 import { playSound, soundEnabled } from '@/utils/sound'
+import { useTheme } from '@/composables/useTheme'
 
 const auth = useAuthStore()
+const { preference } = useTheme()
 const message = useMessage()
 
 const form = reactive({
@@ -103,6 +107,14 @@ async function save() {
 
     <h3 class="device-title">На этом устройстве</h3>
     <div class="device-row">
+      <span class="device-label">Тема</span>
+      <NRadioGroup v-model:value="preference" size="small">
+        <NRadioButton value="light">Пергамент</NRadioButton>
+        <NRadioButton value="dark">Свечи</NRadioButton>
+        <NRadioButton value="system">Как в системе</NRadioButton>
+      </NRadioGroup>
+    </div>
+    <div class="device-row">
       <label class="switch">
         <NSwitch v-model:value="soundEnabled" />
         Звон монет
@@ -137,8 +149,17 @@ async function save() {
 
 .device-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
+  gap: 8px 12px;
+}
+
+.device-row + .device-row {
+  margin-top: 12px;
+}
+
+.device-label {
+  min-width: 48px;
 }
 
 .switch {
