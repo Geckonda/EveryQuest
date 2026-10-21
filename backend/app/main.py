@@ -1,4 +1,3 @@
-import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -7,15 +6,16 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import api_router
 from app.config import settings
+from app.logs import configure_logging
 from app.scheduler import create_scheduler
 
-logging.basicConfig(level=logging.INFO, format="%(levelname)s [%(name)s] %(message)s")
-# APScheduler пишет о каждом запуске задачи; свои итоги задачи логируют сами.
-logging.getLogger("apscheduler").setLevel(logging.WARNING)
+configure_logging()
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    # Обычно задачи выполняет отдельный процесс (app/worker.py); планировщик в API —
+    # для запуска без docker одной командой. Дублей не будет: прогоны под advisory lock.
     scheduler = create_scheduler() if settings.scheduler_enabled else None
     if scheduler:
         scheduler.start()

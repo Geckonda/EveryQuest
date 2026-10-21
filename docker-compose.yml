@@ -29,6 +29,27 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    # Готов — значит, миграции накатились и API отвечает. Воркер ждёт этого.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+
+  # Фоновые задачи: штрафы за просрочку и генерация повторяющихся квестов.
+  worker:
+    build: ./backend
+    command: python -m app.worker
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-everyquest}:${POSTGRES_PASSWORD:-everyquest}@db:5432/${POSTGRES_DB:-everyquest}
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
+    volumes:
+      - ./backend:/app
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
 
   frontend:
     build: ./frontend

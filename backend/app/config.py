@@ -12,8 +12,9 @@ class Settings(BaseSettings):
 
     cors_origins: list[str] = ["http://localhost:5173"]
 
-    # Фоновые задачи (штрафы, генерация повторяющихся квестов). В тестах выключено.
-    scheduler_enabled: bool = True
+    # Планировщик внутри API. По умолчанию выключен: задачи выполняет воркер
+    # (python -m app.worker). Включить — для запуска одним процессом без docker.
+    scheduler_enabled: bool = False
     scheduler_interval_seconds: int = 300
 
 

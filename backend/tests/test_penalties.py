@@ -2,16 +2,18 @@ import threading
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from apscheduler.schedulers.blocking import BlockingScheduler
 from fastapi.testclient import TestClient
-from sqlalchemy import Engine, func, select
+from sqlalchemy import Engine, func, select, text
 from sqlalchemy.orm import Session
 
 from app import jobs
+from app import scheduler as scheduler_module
 from app.config import settings
 from app.jobs import apply_penalties
 from app.main import app
 from app.models import Quest, Tier, Transaction, User
-from app.scheduler import create_scheduler
+from app.scheduler import JOBS_LOCK_KEY, create_scheduler, run_jobs
 from tests.conftest import auth_headers, register
 
 API = "/api/v1"
@@ -226,6 +228,55 @@ def test_complete_vs_penalty_race(engine: Engine, attempt: int) -> None:
 
 def test_scheduler_disabled_in_tests() -> None:
     assert settings.scheduler_enabled is False
+
+
+def test_worker_scheduler_blocks() -> None:
+    """Воркер — отдельный процесс: планировщик блокирует его, а не крутится в потоке."""
+    assert isinstance(create_scheduler(blocking=True), BlockingScheduler)
+
+
+def try_lock(engine: Engine) -> bool:
+    """Свободна ли блокировка задач: берём и сразу отпускаем."""
+    with engine.connect() as conn:
+        got = conn.scalar(text("SELECT pg_try_advisory_lock(:k)"), {"k": JOBS_LOCK_KEY})
+        if got:
+            conn.execute(text("SELECT pg_advisory_unlock(:k)"), {"k": JOBS_LOCK_KEY})
+        conn.commit()
+        return bool(got)
+
+
+@pytest.fixture
+def job_calls(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    """Подменяет задачи: проверяем только оркестрацию и блокировку."""
+    calls: list[str] = []
+    monkeypatch.setattr(scheduler_module, "apply_penalties", lambda db, now: calls.append("p"))
+    monkeypatch.setattr(scheduler_module, "generate_recurring", lambda db, now: calls.append("g"))
+    return calls
+
+
+def test_run_jobs_skipped_while_another_process_holds_lock(
+    engine: Engine, job_calls: list[str]
+) -> None:
+    with engine.connect() as other:
+        other.scalar(text("SELECT pg_advisory_lock(:k)"), {"k": JOBS_LOCK_KEY})
+        assert run_jobs(engine) is False
+        assert job_calls == []
+        other.execute(text("SELECT pg_advisory_unlock(:k)"), {"k": JOBS_LOCK_KEY})
+        other.commit()
+
+    assert run_jobs(engine) is True
+    assert job_calls == ["p", "g"]  # сначала штрафы, потом генерация
+    assert try_lock(engine)  # после прогона блокировка свободна
+
+
+def test_run_jobs_releases_lock_on_error(engine: Engine, monkeypatch: pytest.MonkeyPatch) -> None:
+    def boom(db: Session, now: datetime) -> None:
+        raise RuntimeError("упала задача")
+
+    monkeypatch.setattr(scheduler_module, "apply_penalties", boom)
+    with pytest.raises(RuntimeError):
+        run_jobs(engine)
+    assert try_lock(engine)
 
 
 def test_scheduler_has_quests_job() -> None:

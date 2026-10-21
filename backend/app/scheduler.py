@@ -1,37 +1,60 @@
-"""APScheduler внутри процесса FastAPI.
+"""Планировщик фоновых задач: штрафы и генерация повторяющихся квестов.
 
-Ограничение: при нескольких воркерах uvicorn у каждого будет свой планировщик.
-Задачи идемпотентны и блокируют строки, поэтому дублей не будет, но работа — лишняя.
-Для MVP хватает одного воркера.
+Живёт в отдельном процессе (app/worker.py, сервис worker в docker-compose), а не в API:
+воркеров uvicorn может быть несколько, а задачи должны идти по одному разу.
+Каждый прогон берёт advisory lock Postgres — даже если запущены два воркера
+(или включён планировщик в API), прогон второго просто пропускается.
 """
 
 import logging
 from datetime import UTC, datetime
 
 from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.schedulers.base import BaseScheduler
+from apscheduler.schedulers.blocking import BlockingScheduler
+from sqlalchemy import Engine, text
+from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.db import SessionLocal
+from app.db import engine as default_engine
 from app.economy import utcnow
 from app.jobs import apply_penalties, generate_recurring
 
 logger = logging.getLogger(__name__)
 
+# Ключ advisory lock задач — произвольное число, общее для всех процессов приложения.
+JOBS_LOCK_KEY = 0x45515553  # «EQUS»
 
-def run_jobs() -> None:
-    """Сначала штрафы за прошлые периоды, затем экземпляры за текущие.
+
+def run_jobs(bind: Engine | None = None) -> bool:
+    """Сначала штрафы за прошлые периоды, затем экземпляры за текущие. False — пропущено.
 
     Одна задача, а не две: порядок важен и не зависит от того, какая успела раньше.
+    Блокировка держится на отдельном соединении всё время прогона; задачи работают
+    своими сессиями — advisory lock уровня сессии этому не мешает.
     """
-    now = utcnow()
-    with SessionLocal() as db:
-        apply_penalties(db, now)
-    with SessionLocal() as db:
-        generate_recurring(db, now)
+    bind = bind or default_engine
+    with bind.connect() as lock:
+        if not lock.scalar(text("SELECT pg_try_advisory_lock(:key)"), {"key": JOBS_LOCK_KEY}):
+            logger.info("Задачи уже выполняет другой процесс — пропускаю")
+            return False
+        try:
+            now = utcnow()
+            with Session(bind, expire_on_commit=False) as db:
+                apply_penalties(db, now)
+            with Session(bind, expire_on_commit=False) as db:
+                generate_recurring(db, now)
+        finally:
+            lock.execute(text("SELECT pg_advisory_unlock(:key)"), {"key": JOBS_LOCK_KEY})
+            lock.commit()
+    return True
 
 
-def create_scheduler() -> BackgroundScheduler:
-    scheduler = BackgroundScheduler(timezone=UTC)
+def create_scheduler(*, blocking: bool = False) -> BaseScheduler:
+    """blocking — для отдельного процесса-воркера; иначе фоновый поток внутри API."""
+    scheduler: BaseScheduler = (
+        BlockingScheduler(timezone=UTC) if blocking else BackgroundScheduler(timezone=UTC)
+    )
     scheduler.add_job(
         run_jobs,
         "interval",
