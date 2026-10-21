@@ -1,4 +1,6 @@
 .env
+# Дампы базы на сервере (docker-compose.prod.yml, сервис backup)
+backups/
 
 # Python
 __pycache__/

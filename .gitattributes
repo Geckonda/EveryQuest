@@ -1,0 +1,4 @@
+# Скрипты и конфиги, которые выполняются в Linux-контейнерах, — только с LF:
+# с CRLF из Windows-клона sh падает на первой же строке.
+*.sh text eol=lf
+Caddyfile text eol=lf

@@ -1,0 +1,33 @@
+# Прод: HTTPS, статика фронта и прокси API. Домен — из переменной DOMAIN (.env на сервере).
+{$DOMAIN} {
+	encode zstd gzip
+
+	handle /api/* {
+		# Caddy подставляет настоящий IP клиента в X-Forwarded-For (чужой заголовок
+		# от клиента отбрасывает) — бэкенд считает по нему лимит попыток входа.
+		reverse_proxy backend:8000
+	}
+
+	handle {
+		root * /srv
+		# Маршруты Vue Router (/quests, /calendar…) — на index.html.
+		try_files {path} /index.html
+		file_server
+
+		# Файлы сборки с хэшем в имени не меняются — кэшируем навсегда.
+		@assets path /assets/*
+		header @assets Cache-Control "public, max-age=31536000, immutable"
+		# Всё остальное — это index.html (и под маршрутами /quests, /calendar…): всегда свежий,
+		# иначе после обновления открылась бы старая версия. Матчер — по исходному пути:
+		# заголовки ставятся до подмены пути в try_files.
+		@html not path /assets/*
+		header @html Cache-Control "no-cache"
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		X-Frame-Options DENY
+	}
+}

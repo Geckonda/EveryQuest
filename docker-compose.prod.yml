@@ -1,0 +1,98 @@
+# Прод: docker compose -f docker-compose.prod.yml up -d --build
+# Настройки — в .env рядом (образец: .env.prod.example). Инструкция — DEPLOY.md.
+#
+# Наружу открыт только web (Caddy, 80/443): HTTPS, статика фронта, прокси /api.
+# База, API и воркер — во внутренней сети Docker, из интернета недоступны.
+# Своё имя проекта: не пересекается с dev-окружением (томами базы) на той же машине.
+name: everyquest-prod
+
+x-backend-env: &backend-env
+  DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-everyquest}:${POSTGRES_PASSWORD:?задайте POSTGRES_PASSWORD в .env}@db:5432/${POSTGRES_DB:-everyquest}
+  JWT_SECRET: ${JWT_SECRET:?задайте JWT_SECRET в .env}
+  # prod — сервер не стартует со слабым секретом и без Secure-cookie.
+  ENVIRONMENT: prod
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-everyquest}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?задайте POSTGRES_PASSWORD в .env}
+      POSTGRES_DB: ${POSTGRES_DB:-everyquest}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  backend:
+    build:
+      context: ./backend
+      target: prod
+    image: everyquest-backend
+    restart: unless-stopped
+    environment: *backend-env
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+
+  # Фоновые задачи: штрафы за просрочку, повторяющиеся квесты, уборка сессий.
+  worker:
+    image: everyquest-backend
+    restart: unless-stopped
+    command: python -m app.worker
+    environment: *backend-env
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ./frontend
+      target: prod
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:?задайте DOMAIN в .env}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp" # HTTP/3
+    volumes:
+      # Сертификаты Let's Encrypt — переживают пересоздание контейнера.
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  # Ежедневный дамп базы в ./backups на сервере, старые удаляются (BACKUP_KEEP_DAYS).
+  backup:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    entrypoint: ["sh", "/scripts/backup.sh"]
+    environment:
+      PGHOST: db
+      PGUSER: ${POSTGRES_USER:-everyquest}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?задайте POSTGRES_PASSWORD в .env}
+      PGDATABASE: ${POSTGRES_DB:-everyquest}
+      BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-14}
+    volumes:
+      - ./scripts:/scripts:ro
+      - ./backups:/backups
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

@@ -17,6 +17,10 @@ docker compose up -d --build
 
 Фоновые задачи (штрафы за просрочку, генерация повторяющихся квестов) выполняет отдельный сервис `worker` (`python -m app.worker`) раз в 5 минут и сразу при старте. Он стартует после того, как бэкенд накатил миграции. Код воркера на лету не перезагружается — после правок `app/jobs.py` или `app/scheduler.py`: `docker compose restart worker`. Без docker задачи можно запустить внутри API: `SCHEDULER_ENABLED=true`.
 
+## Прод
+
+Сервер: `docker-compose.prod.yml` — HTTPS (Caddy), прод-сборки, бэкапы. Пошагово — [DEPLOY.md](DEPLOY.md).
+
 ## Структура
 
 ```
