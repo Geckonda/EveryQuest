@@ -13,6 +13,7 @@ import { useSessionsStore } from '@/stores/sessions'
 import { signed } from '@/utils/format'
 import { todayBoard } from '@/utils/today'
 import CoinIcon from '@/components/CoinIcon.vue'
+import EmptyState from '@/components/EmptyState.vue'
 import QuestCard from '@/components/QuestCard.vue'
 import QuestFormModal from '@/components/QuestFormModal.vue'
 import SessionList from '@/components/SessionList.vue'
@@ -140,11 +141,18 @@ const stats = computed(() => {
         На сегодня
         <span v-if="board.today.length" class="count">({{ board.today.length }})</span>
       </h2>
-      <p v-if="!board.today.length" class="empty">
-        На сегодня квестов со сроком нет.
-        <RouterLink to="/quests">Вся доска</RouterLink>
-        <template v-if="board.noDue.length"> или возьмитесь за побочный квест ниже.</template>
-      </p>
+      <EmptyState
+        v-if="!board.today.length"
+        art="rest"
+        :text="
+          board.noDue.length
+            ? 'На сегодня квестов со сроком нет — можно взяться за побочный ниже.'
+            : 'На сегодня квестов со сроком нет. Отдыхайте — или повесьте новый.'
+        "
+        compact
+      >
+        <RouterLink to="/quests" class="board-link">Вся доска</RouterLink>
+      </EmptyState>
       <QuestCard
         v-for="quest in board.today"
         :key="quest.id"
@@ -269,9 +277,8 @@ const stats = computed(() => {
   box-shadow: var(--shadow-note);
 }
 
-.empty {
-  margin: 0;
-  color: var(--color-muted);
-  font-style: italic;
+.board-link {
+  margin-top: 6px;
+  color: var(--color-gold);
 }
 </style>

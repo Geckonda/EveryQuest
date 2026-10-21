@@ -49,6 +49,7 @@ const tierOf = (t: RecurringQuest) => catalog.tiers.find((tier) => tier.id === t
     :items="recurring.templates"
     add-label="Новый повторяющийся"
     empty-text="Повторяющихся квестов нет. Зарядка каждый день? Уборка по субботам?"
+    empty-art="recurring"
     @add="open(null)"
     @edit="open"
     @toggle-archive="

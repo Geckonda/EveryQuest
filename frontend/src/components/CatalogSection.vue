@@ -1,11 +1,14 @@
 <script setup lang="ts" generic="T extends { id: number; is_archived: boolean }">
 import { computed, ref } from 'vue'
-import { NButton, NEmpty, NSwitch } from 'naive-ui'
+import { NButton, NSwitch } from 'naive-ui'
+import EmptyState, { type EmptyArt } from './EmptyState.vue'
 
 const props = defineProps<{
   items: T[]
   addLabel: string
   emptyText: string
+  /** Рисунок пустого списка. */
+  emptyArt?: EmptyArt
 }>()
 
 defineEmits<{
@@ -40,7 +43,7 @@ const visible = computed(() =>
     </div>
     <slot name="toolbar" />
 
-    <NEmpty v-if="!visible.length" :description="emptyText" class="empty" />
+    <EmptyState v-if="!visible.length" :art="emptyArt ?? 'board'" :text="emptyText" />
     <ul v-else class="list">
       <li v-for="item in visible" :key="item.id" :class="{ archived: item.is_archived }">
         <div class="content">
@@ -76,10 +79,6 @@ const visible = computed(() =>
   color: var(--color-muted);
   font-size: 0.875rem;
   cursor: pointer;
-}
-
-.empty {
-  padding: 32px 0;
 }
 
 .list {

@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { NAlert, NButton, NEmpty, NSelect, NSpin } from 'naive-ui'
+import { NAlert, NButton, NSelect, NSpin } from 'naive-ui'
 import { api } from '@/api/client'
 import type { Transaction, TransactionPage, TransactionType } from '@/api/types'
 import { errorMessage } from '@/api/errors'
 import { formatDateTime, signed } from '@/utils/format'
 import ManualTransactionModal from '@/components/ManualTransactionModal.vue'
+import EmptyState from '@/components/EmptyState.vue'
 
 const PAGE_SIZE = 50
 
@@ -69,10 +70,10 @@ onMounted(() => load(true))
 
   <NAlert v-if="error" type="error">{{ error }}</NAlert>
   <NSpin v-else :show="loading && !items.length">
-    <NEmpty
+    <EmptyState
       v-if="!loading && !items.length"
-      description="Страницы летописи пока чисты"
-      class="empty"
+      art="chronicle"
+      text="Страницы летописи пока чисты"
     />
     <ul class="list">
       <li v-for="t in items" :key="t.id">
@@ -118,10 +119,6 @@ onMounted(() => load(true))
 .filter {
   max-width: 240px;
   margin-bottom: 8px;
-}
-
-.empty {
-  padding: 32px 0;
 }
 
 .list {

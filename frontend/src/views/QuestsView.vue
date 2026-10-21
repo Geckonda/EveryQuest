@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { NAlert, NButton, NEmpty, NSpin, NTabPane, NTabs, useMessage } from 'naive-ui'
+import { NAlert, NButton, NSpin, NTabPane, NTabs, useMessage } from 'naive-ui'
 import type { Quest } from '@/api/types'
 import { errorMessage } from '@/api/errors'
 import { filterQuests } from '@/utils/questFilters'
@@ -9,6 +9,7 @@ import { useQuestActions, useQuestNow } from '@/composables/useQuestActions'
 import { useCatalogStore } from '@/stores/catalog'
 import { useQuestsStore } from '@/stores/quests'
 import { useRecurringStore } from '@/stores/recurring'
+import EmptyState from '@/components/EmptyState.vue'
 import QuestCard from '@/components/QuestCard.vue'
 import RecurringList from '@/components/RecurringList.vue'
 import QuestFormModal from '@/components/QuestFormModal.vue'
@@ -113,10 +114,10 @@ async function loadMoreHistory() {
   <NSpin v-else :show="loading">
     <NTabs type="line" animated @update:value="onTabChange">
       <NTabPane name="active" :tab="`Открытые (${quests.active.length})`">
-        <NEmpty
+        <EmptyState
           v-if="!quests.active.length"
-          description="Доска пуста. Повесьте первый квест — и зарабатывайте золото на отдых"
-          class="empty"
+          art="board"
+          text="Доска пуста. Повесьте первый квест — и зарабатывайте золото на отдых"
         />
         <template v-else>
           <QuestFilters
@@ -125,10 +126,11 @@ async function loadMoreHistory() {
             :total="quests.active.length"
             @reset="resetFilters"
           />
-          <NEmpty
+          <EmptyState
             v-if="!visibleActive.length"
-            description="Под фильтры ни один квест не подходит"
-            class="empty"
+            art="search"
+            text="Под фильтры ни один квест не подходит"
+            compact
           />
         </template>
         <QuestCard
@@ -147,10 +149,10 @@ async function loadMoreHistory() {
       </NTabPane>
       <NTabPane name="history" tab="Архив">
         <NSpin :show="historyLoading">
-          <NEmpty
+          <EmptyState
             v-if="historyLoaded && !quests.history.length"
-            description="Пока ни одного закрытого квеста"
-            class="empty"
+            art="archive"
+            text="Пока ни одного закрытого квеста"
           />
           <QuestCard
             v-for="quest in quests.history"
@@ -183,10 +185,6 @@ async function loadMoreHistory() {
   align-items: flex-end;
   justify-content: space-between;
   gap: 12px;
-}
-
-.empty {
-  padding: 32px 0;
 }
 
 .more {

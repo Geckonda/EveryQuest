@@ -112,6 +112,7 @@ function buy(reward: Reward, event: MouseEvent) {
     <CatalogSection
       :items="visible"
       add-label="Добавить в меню"
+      :empty-art="filtering ? 'search' : 'tavern'"
       :empty-text="
         filtering
           ? 'Ничего не нашлось — попробуйте другой запрос'
