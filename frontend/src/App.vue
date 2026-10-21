@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import {
   NButton,
@@ -25,6 +25,18 @@ const router = useRouter()
 const { isDark } = useTheme()
 const theme = computed(() => (isDark.value ? darkTheme : null))
 const overrides = computed(() => (isDark.value ? darkOverrides : lightOverrides))
+
+// Телефон — та же граница, что у панели вкладок в стилях ниже.
+const phoneQuery = window.matchMedia('(max-width: 640px)')
+const isPhone = ref(phoneQuery.matches)
+phoneQuery.addEventListener('change', (event) => (isPhone.value = event.matches))
+
+// Сообщения на телефоне — над панелью вкладок, а не под ней.
+const messagesStyle = computed(() =>
+  isPhone.value && auth.user
+    ? { bottom: 'calc(var(--tab-bar-height) + 8px + env(safe-area-inset-bottom))' }
+    : undefined,
+)
 
 const navItems: { to: string; label: string; icon: IconName }[] = [
   { to: '/', label: 'Сегодня', icon: 'today' },
@@ -68,7 +80,7 @@ onUnmounted(() => document.removeEventListener('visibilitychange', onVisibilityC
     :date-locale="dateRuRU"
   >
     <!-- Сообщения снизу: сверху они закрывали бы кошелёк и его анимацию. -->
-    <NMessageProvider placement="bottom">
+    <NMessageProvider placement="bottom" :container-style="messagesStyle">
       <NDialogProvider>
         <header class="sign">
           <div class="sign-row">

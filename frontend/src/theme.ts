@@ -15,8 +15,9 @@ const shared: GlobalThemeOverrides = {
     borderRadius: '4px',
     borderRadiusSmall: '3px',
   },
-  Card: { titleFontWeight: '700', titleFontSizeMedium: '22px', titleFontSizeSmall: '20px' },
-  Dialog: { titleFontWeight: '700', titleFontSize: '20px' },
+  // Размер заголовков — здесь, а не CSS с !important; шрифт — в main.css (токена шрифта нет).
+  Card: { titleFontWeight: '700', titleFontSizeMedium: '24px', titleFontSizeSmall: '22px' },
+  Dialog: { titleFontWeight: '700', titleFontSize: '24px' },
   Tabs: { tabFontWeightActive: '700' },
   Button: { fontWeight: '600' },
 }
