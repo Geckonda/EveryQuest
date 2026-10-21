@@ -5,6 +5,7 @@ import type { Category, Tier } from '@/api/types'
 import { errorMessage } from '@/api/errors'
 import { useCatalogStore } from '@/stores/catalog'
 import { useArchiveToggle } from '@/composables/useArchiveToggle'
+import { tierLabel } from '@/utils/format'
 import CatalogSection from '@/components/CatalogSection.vue'
 import CoinIcon from '@/components/CoinIcon.vue'
 import TierSeal from '@/components/TierSeal.vue'
@@ -65,6 +66,7 @@ function openCategory(category: Category | null) {
           <template #item="{ item: tier }">
             <div class="line">
               <TierSeal :tier="tier" />
+              <span v-if="tierLabel(tier)" class="tier-name">{{ tierLabel(tier) }}</span>
               <span class="reward num"><CoinIcon :size="14" /> +{{ tier.default_reward }}</span>
               <span class="penalty num">штраф {{ tier.default_penalty }}</span>
             </div>
@@ -119,7 +121,18 @@ function openCategory(category: Category | null) {
   font-weight: 700;
 }
 
+.tier-name {
+  min-width: 0;
+  overflow: hidden;
+  font-family: var(--font-heading);
+  font-size: 1.15rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .reward {
+  flex: none;
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -128,6 +141,7 @@ function openCategory(category: Category | null) {
 }
 
 .penalty {
+  flex: none;
   color: var(--color-error);
   font-size: 0.875rem;
 }

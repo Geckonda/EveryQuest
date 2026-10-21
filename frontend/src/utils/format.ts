@@ -14,6 +14,18 @@ export function coins(n: number): string {
   return `${n} ${plural(n, 'золотой', 'золотых', 'золотых')}`
 }
 
+const ROMAN = ['I', 'II', 'III', 'IV', 'V']
+
+/** Уровень тира (1–5) римской цифрой: 3 → «III». */
+export function romanLevel(level: number): string {
+  return ROMAN[level - 1] ?? String(level)
+}
+
+/** Название тира стоит показывать текстом, только если оно не совпадает с цифрой на печати. */
+export function tierLabel(tier: { name: string; level: number }): string | null {
+  return tier.name.trim() === romanLevel(tier.level) ? null : tier.name
+}
+
 /** Сумма со знаком: «+50», «−30» (типографский минус). */
 export function signed(n: number): string {
   return n > 0 ? `+${n}` : n < 0 ? `−${Math.abs(n)}` : '0'

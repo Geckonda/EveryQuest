@@ -1,5 +1,27 @@
 import { describe, expect, it } from 'vitest'
-import { coins, dueLabel, plural, signed } from '../format'
+import { coins, dueLabel, plural, romanLevel, signed, tierLabel } from '../format'
+
+describe('romanLevel', () => {
+  it.each([
+    [1, 'I'],
+    [4, 'IV'],
+    [5, 'V'],
+    [7, '7'],
+  ])('%i → %s', (level, text) => {
+    expect(romanLevel(level)).toBe(text)
+  })
+})
+
+describe('tierLabel', () => {
+  it('не дублирует цифру на печати', () => {
+    expect(tierLabel({ name: 'III', level: 3 })).toBeNull()
+  })
+
+  it('показывает своё название', () => {
+    expect(tierLabel({ name: 'Эпический', level: 5 })).toBe('Эпический')
+    expect(tierLabel({ name: 'II', level: 3 })).toBe('II')
+  })
+})
 
 describe('coins', () => {
   it.each([

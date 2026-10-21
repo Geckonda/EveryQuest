@@ -109,4 +109,26 @@ const visible = computed(() =>
   flex-wrap: wrap;
   justify-content: flex-end;
 }
+
+/* На телефоне кнопки уходят под содержимое, иначе сжимают его в узкую колонку. */
+@media (max-width: 560px) {
+  .list li {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .content {
+    flex-basis: 100%;
+  }
+
+  .actions {
+    flex: 1 1 100%;
+    justify-content: flex-start;
+    margin-left: -12px; /* выравнивает текст quaternary-кнопок по краю содержимого */
+  }
+
+  .toolbar {
+    flex-wrap: wrap;
+  }
+}
 </style>

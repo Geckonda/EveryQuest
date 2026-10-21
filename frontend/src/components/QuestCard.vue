@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { NButton } from 'naive-ui'
 import type { Category, Quest, Tier } from '@/api/types'
-import { dueLabel, formatDateTime } from '@/utils/format'
+import { dueLabel, formatDateTime, tierLabel } from '@/utils/format'
 import CoinIcon from './CoinIcon.vue'
 import TierSeal from './TierSeal.vue'
 
@@ -45,6 +45,7 @@ const stamp = computed(() => (props.quest.status === 'active' ? null : STAMP[pro
         <span v-if="quest.penalty" class="penalty num" title="Штраф за провал">
           штраф {{ quest.penalty }}
         </span>
+        <span v-if="tier && tierLabel(tier)" class="tier">{{ tierLabel(tier) }}</span>
         <span v-if="category" class="category">
           <span class="dot" :style="{ background: category.color ?? 'currentColor' }" />
           {{ category.name }}
@@ -178,6 +179,15 @@ const stamp = computed(() => (props.quest.status === 'active' ? null : STAMP[pro
 .penalty {
   color: var(--color-error);
   font-size: 0.875rem;
+}
+
+.tier {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 0.875rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .category {

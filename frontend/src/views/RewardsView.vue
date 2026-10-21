@@ -112,8 +112,10 @@ function buy(reward: Reward) {
 </template>
 
 <style scoped>
+/* Длинное название не влезает — точки и цена переносятся на следующую строку. */
 .line {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   gap: 6px;
 }
