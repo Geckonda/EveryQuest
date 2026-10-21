@@ -73,6 +73,7 @@ onUnmounted(() => {
     :class="[flash, { negative: balance < 0 }]"
     :title="balance < 0 ? 'Долг перед гильдией' : 'Кошель'"
     data-purse
+    data-tour="purse"
   >
     <CoinIcon :size="18" />
     {{ shown }}

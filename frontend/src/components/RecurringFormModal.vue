@@ -25,6 +25,7 @@ import { useRewardFields } from '@/composables/useRewardFields'
 import PenaltyHint from './PenaltyHint.vue'
 import { plural } from '@/utils/format'
 import { WEEKDAYS, describeSchedule } from '@/utils/schedule'
+import HelpHint from './HelpHint.vue'
 
 const props = defineProps<{ template: RecurringQuest | null }>()
 const show = defineModel<boolean>('show', { required: true })
@@ -164,7 +165,12 @@ async function save() {
         />
       </NFormItem>
       <div class="row">
-        <NFormItem label="Тир">
+        <NFormItem>
+          <template #label
+            >Тир
+            <HelpHint
+              text="Тир — важность квеста: от него награда по умолчанию. Тиры и их награды — в «Настройках»."
+          /></template>
           <NSelect v-model:value="form.tierId" :options="tierOptions" />
         </NFormItem>
         <NFormItem label="Категория">

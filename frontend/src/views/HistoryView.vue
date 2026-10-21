@@ -8,6 +8,7 @@ import { formatDateTime, signed } from '@/utils/format'
 import ManualTransactionModal from '@/components/ManualTransactionModal.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import AppIcon from '@/components/AppIcon.vue'
+import HelpHint from '@/components/HelpHint.vue'
 
 const PAGE_SIZE = 50
 
@@ -56,7 +57,12 @@ onMounted(() => load(true))
 <template>
   <div class="title-row">
     <div>
-      <h1 class="page-title">Летопись</h1>
+      <h1 class="page-title">
+        Летопись
+        <HelpHint
+          text="Все движения золота: награды, штрафы, заказы и отмены. Ошиблись — «Поправка» добавит или спишет вручную, с комментарием."
+        />
+      </h1>
       <p class="page-subtitle">Каждый золотой на счету</p>
     </div>
     <NButton size="small" @click="manualModal = true">Поправка</NButton>

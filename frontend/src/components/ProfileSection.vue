@@ -21,6 +21,8 @@ import { penaltyFor } from '@/utils/penalty'
 import { playSound, soundEnabled } from '@/utils/sound'
 import { useTheme } from '@/composables/useTheme'
 import DeviceList from './DeviceList.vue'
+import { useTour } from '@/composables/useTour'
+import HelpHint from './HelpHint.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -56,6 +58,14 @@ const timezoneOptions = Intl.supportedValuesOf('timeZone').map((tz) => ({ label:
 const example = computed(() => (form.multiplier === null ? null : penaltyFor(50, form.multiplier)))
 
 const isComplete = computed(() => form.username.trim() !== '' && form.multiplier !== null)
+
+const tour = useTour()
+
+/** Обзор показывает разделы на главной — туда и переходим. */
+async function replayTour() {
+  await router.push('/')
+  tour.start()
+}
 
 function confirmLogoutAll() {
   dialog.warning({
@@ -110,7 +120,12 @@ async function save() {
         </button>
       </template>
     </NFormItem>
-    <NFormItem label="Множитель штрафа">
+    <NFormItem>
+      <template #label
+        >Множитель штрафа
+        <HelpHint
+          text="Штраф нового квеста = награда × множитель. 0 — без штрафов, 2 — штраф вдвое больше награды. В форме квеста его всегда можно поменять."
+      /></template>
       <NInputNumber
         v-model:value="form.multiplier"
         :min="0"
@@ -148,6 +163,9 @@ async function save() {
       <NButton size="small" quaternary :disabled="!soundEnabled" @click="playSound('reward')">
         Послушать
       </NButton>
+    </div>
+    <div class="device-row">
+      <NButton size="small" secondary @click="replayTour">Показать обзор возможностей</NButton>
     </div>
 
     <h3 class="device-title">Безопасность</h3>

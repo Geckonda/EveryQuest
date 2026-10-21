@@ -13,6 +13,8 @@ import {
 import { useAuthStore } from '@/stores/auth'
 import { darkOverrides, lightOverrides } from '@/theme'
 import { useTheme } from '@/composables/useTheme'
+import { TOUR_STEPS, useTour } from '@/composables/useTour'
+import GuidedTour from '@/components/GuidedTour.vue'
 import AppIcon, { type IconName } from '@/components/AppIcon.vue'
 import PurseBadge from '@/components/PurseBadge.vue'
 import SessionTimer from '@/components/SessionTimer.vue'
@@ -40,14 +42,17 @@ const messagesStyle = computed(() =>
     : undefined,
 )
 
-const navItems: { to: string; label: string; icon: IconName }[] = [
-  { to: '/', label: 'Сегодня', icon: 'today' },
-  { to: '/quests', label: 'Квесты', icon: 'quests' },
-  { to: '/calendar', label: 'Календарь', icon: 'calendar' },
-  { to: '/rewards', label: 'Таверна', icon: 'tavern' },
-  { to: '/history', label: 'Летопись', icon: 'chronicle' },
-  { to: '/settings', label: 'Настройки', icon: 'settings' },
+// tour — метка для обзора возможностей (одна и та же в шапке и в нижней панели).
+const navItems: { to: string; label: string; icon: IconName; tour: string }[] = [
+  { to: '/', label: 'Сегодня', icon: 'today', tour: 'nav-today' },
+  { to: '/quests', label: 'Квесты', icon: 'quests', tour: 'nav-quests' },
+  { to: '/calendar', label: 'Календарь', icon: 'calendar', tour: 'nav-calendar' },
+  { to: '/rewards', label: 'Таверна', icon: 'tavern', tour: 'nav-tavern' },
+  { to: '/history', label: 'Летопись', icon: 'chronicle', tour: 'nav-chronicle' },
+  { to: '/settings', label: 'Настройки', icon: 'settings', tour: 'nav-settings' },
 ]
+
+const tour = useTour()
 
 async function logout() {
   await auth.logout()
@@ -99,7 +104,12 @@ onUnmounted(() => document.removeEventListener('visibilitychange', onVisibilityC
             </div>
           </div>
           <nav v-if="auth.user" class="sign-nav">
-            <RouterLink v-for="item in navItems" :key="item.to" :to="item.to">
+            <RouterLink
+              v-for="item in navItems"
+              :key="item.to"
+              :to="item.to"
+              :data-tour="item.tour"
+            >
               {{ item.label }}
             </RouterLink>
           </nav>
@@ -111,11 +121,18 @@ onUnmounted(() => document.removeEventListener('visibilitychange', onVisibilityC
         </main>
         <!-- На телефоне меню — панель вкладок внизу, под большим пальцем. -->
         <nav v-if="auth.user" class="tab-bar" aria-label="Разделы">
-          <RouterLink v-for="item in navItems" :key="item.to" :to="item.to" class="tab">
+          <RouterLink
+            v-for="item in navItems"
+            :key="item.to"
+            :to="item.to"
+            :data-tour="item.tour"
+            class="tab"
+          >
             <AppIcon :name="item.icon" :size="22" />
             <span>{{ item.label }}</span>
           </RouterLink>
         </nav>
+        <GuidedTour v-if="auth.user" v-model:open="tour.open.value" :steps="TOUR_STEPS" />
       </NDialogProvider>
     </NMessageProvider>
   </NConfigProvider>

@@ -17,6 +17,7 @@ import QuestCard from '@/components/QuestCard.vue'
 import QuestFormModal from '@/components/QuestFormModal.vue'
 import TierSeal from '@/components/TierSeal.vue'
 import AppIcon from '@/components/AppIcon.vue'
+import HelpHint from '@/components/HelpHint.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -126,7 +127,12 @@ const forecastLabel = (item: ForecastQuest) => dueLabel(item.due_at, now.value).
 </script>
 
 <template>
-  <h1 class="page-title">Календарь</h1>
+  <h1 class="page-title">
+    Календарь
+    <HelpHint
+      text="Точки — квесты по сроку: цвет тира у открытых, зелёная — сдан, красная — провален. Кольцо — повторяющийся квест, который ещё появится. Нажмите на день, чтобы увидеть список."
+    />
+  </h1>
   <p class="page-subtitle">Сроки квестов и что появится по расписанию</p>
   <div class="flourish"><AppIcon name="sparkle" :size="14" /></div>
 

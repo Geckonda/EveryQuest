@@ -13,6 +13,7 @@ import TierFormModal from '@/components/TierFormModal.vue'
 import CategoryFormModal from '@/components/CategoryFormModal.vue'
 import ProfileSection from '@/components/ProfileSection.vue'
 import AppIcon from '@/components/AppIcon.vue'
+import HelpHint from '@/components/HelpHint.vue'
 
 const catalog = useCatalogStore()
 const toggleArchive = useArchiveToggle()
@@ -47,7 +48,12 @@ function openCategory(category: Category | null) {
 </script>
 
 <template>
-  <h1 class="page-title">Настройки</h1>
+  <h1 class="page-title">
+    Настройки
+    <HelpHint
+      text="Тиры — уровни важности квестов и их награда. Категории — сферы жизни для фильтров. В профиле — часовой пояс, множитель штрафа, тема, звук и устройства."
+    />
+  </h1>
   <p class="page-subtitle">Устав гильдии: тиры квестов и их награды, категории дел, профиль</p>
   <div class="flourish"><AppIcon name="sparkle" :size="14" /></div>
   <NAlert v-if="loadError" type="error">{{ loadError }}</NAlert>

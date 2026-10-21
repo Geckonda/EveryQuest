@@ -4,11 +4,13 @@ import { RouterLink, useRouter } from 'vue-router'
 import { NAlert, NButton, NCard, NForm, NFormItem, NInput } from 'naive-ui'
 import { useAuthStore } from '@/stores/auth'
 import { errorMessage } from '@/api/errors'
+import { useTour } from '@/composables/useTour'
 
 const MIN_PASSWORD = 8
 
 const auth = useAuthStore()
 const router = useRouter()
+const { start: startTour } = useTour()
 
 const email = ref('')
 const username = ref('')
@@ -45,6 +47,8 @@ async function submit() {
       timezone,
     })
     await router.replace('/')
+    // Новичку — обзор возможностей, один раз сразу после регистрации.
+    startTour()
   } catch (e) {
     error.value = errorMessage(e)
   } finally {

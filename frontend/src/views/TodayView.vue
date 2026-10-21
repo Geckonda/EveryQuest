@@ -18,6 +18,7 @@ import QuestCard from '@/components/QuestCard.vue'
 import QuestFormModal from '@/components/QuestFormModal.vue'
 import SessionList from '@/components/SessionList.vue'
 import AppIcon from '@/components/AppIcon.vue'
+import HelpHint from '@/components/HelpHint.vue'
 
 const auth = useAuthStore()
 const catalog = useCatalogStore()
@@ -92,10 +93,20 @@ const stats = computed(() => {
 <template>
   <div class="title-row">
     <div>
-      <h1 class="page-title">Сегодня</h1>
+      <h1 class="page-title">
+        Сегодня
+        <HelpHint
+          text="Квесты со сроком на сегодня — важные сверху, итог дня и идущий отдых. «Сегодня» считается по часовому поясу из профиля."
+        />
+      </h1>
       <p class="page-subtitle date">{{ dateTitle }}</p>
     </div>
-    <NButton type="primary" :disabled="loading || !!loadError" @click="open(null)">
+    <NButton
+      type="primary"
+      data-tour="new-quest"
+      :disabled="loading || !!loadError"
+      @click="open(null)"
+    >
       Повесить квест
     </NButton>
   </div>
@@ -121,7 +132,12 @@ const stats = computed(() => {
     </div>
 
     <section v-if="sessions.active.length" class="block session-block">
-      <h2 class="block-title">Идёт сейчас</h2>
+      <h2 class="block-title">
+        Идёт сейчас
+        <HelpHint
+          text="Заказанный отдых со временем. Следующий заказ можно поставить в очередь — начнётся, когда кончится текущий. Закончили раньше — очередь сдвинется вперёд."
+        />
+      </h2>
       <SessionList size="large" />
     </section>
 
@@ -140,6 +156,9 @@ const stats = computed(() => {
     <section class="block">
       <h2 class="block-title">
         На сегодня
+        <HelpHint
+          text="Квесты со сроком до конца дня. Сдали или провалили по ошибке — «Отменить» работает 10 минут."
+        />
         <span v-if="board.today.length" class="count">({{ board.today.length }})</span>
       </h2>
       <EmptyState

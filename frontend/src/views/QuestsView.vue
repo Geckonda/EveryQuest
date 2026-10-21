@@ -15,6 +15,7 @@ import RecurringList from '@/components/RecurringList.vue'
 import QuestFormModal from '@/components/QuestFormModal.vue'
 import QuestFilters from '@/components/QuestFilters.vue'
 import AppIcon from '@/components/AppIcon.vue'
+import HelpHint from '@/components/HelpHint.vue'
 
 const catalog = useCatalogStore()
 const quests = useQuestsStore()
@@ -102,7 +103,12 @@ async function loadMoreHistory() {
 <template>
   <div class="title-row">
     <div>
-      <h1 class="page-title">Доска квестов</h1>
+      <h1 class="page-title">
+        Доска квестов
+        <HelpHint
+          text="Квест — награда за выполнение и штраф за сорванный срок. Тир задаёт награду, штраф = награда × множитель из профиля. «Провалить» — честно признать, штраф сразу. «Снять с доски» — убрать без награды и штрафа. Повторяющиеся появляются сами по расписанию."
+        />
+      </h1>
       <p class="page-subtitle">Любишь кататься — люби и саночки возить</p>
     </div>
     <NButton type="primary" :disabled="loading || !!loadError" @click="open(null)">
