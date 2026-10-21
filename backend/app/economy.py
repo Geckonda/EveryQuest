@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.models import Quest, Reward, RewardSession, Transaction, User
 from app.schemas import TransactionType
+from app.sessions import queue_end
 
 
 class InsufficientFunds(Exception):  # noqa: N818 — доменная ошибка, не «Error»
@@ -95,11 +96,12 @@ def record_transaction(
 
 
 def purchase(
-    db: Session, user_id: int, reward: Reward
+    db: Session, user_id: int, reward: Reward, *, queue: bool = True
 ) -> tuple[Transaction, User, RewardSession | None]:
     """Покупка разрешена, только если хватает монет; в минусе купить ничего нельзя.
 
-    У траты с длительностью в той же транзакции стартует сеанс — отсчёт с момента заказа.
+    У траты с длительностью в той же транзакции создаётся сеанс: queue — встаёт в очередь
+    за уже идущими тратами, иначе отсчёт с момента заказа, параллельно с ними.
     """
     user = lock_user(db, user_id)
     if user.balance < reward.price:
@@ -108,7 +110,8 @@ def purchase(
 
     session = None
     if reward.duration_minutes:
-        started_at = utcnow()
+        now = utcnow()
+        started_at = queue_end(db, user.id, now) if queue else now
         session = RewardSession(
             user_id=user.id,
             reward_id=reward.id,

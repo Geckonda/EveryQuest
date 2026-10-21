@@ -42,12 +42,15 @@ def update_reward(
 
 
 @router.post("/{reward_id}/purchase", responses={400: {"description": "Не хватает монет"}})
-def purchase_reward(reward_id: int, user: CurrentUser, db: DbSession) -> PurchaseOut:
+def purchase_reward(
+    reward_id: int, user: CurrentUser, db: DbSession, queue: bool = True
+) -> PurchaseOut:
+    """queue=false — трата со временем стартует сразу, параллельно с уже идущими."""
     reward = get_owned(db, Reward, reward_id, user)
     if reward.is_archived:
         raise HTTPException(status.HTTP_409_CONFLICT, "Трата в архиве")
     try:
-        transaction, locked_user, session = purchase(db, user.id, reward)
+        transaction, locked_user, session = purchase(db, user.id, reward, queue=queue)
     except InsufficientFunds as error:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(error)) from None
     db.commit()

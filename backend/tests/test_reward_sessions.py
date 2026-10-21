@@ -1,25 +1,49 @@
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from app import economy
+from app.api import reward_sessions as sessions_api
 from app.models import RewardSession
 from tests.conftest import auth_headers, register
 from tests.test_economy import create_reward, earn
 
 API = "/api/v1"
+T0 = datetime(2026, 10, 21, 12, 0, tzinfo=UTC)
+
+
+class Clock:
+    """Управляемое «сейчас» для покупок и сеансов."""
+
+    def __init__(self) -> None:
+        self.now = T0
+
+    def at(self, minutes: float) -> str:
+        """Момент T0 + minutes в формате ответа API."""
+        return (T0 + timedelta(minutes=minutes)).isoformat().replace("+00:00", "Z")
 
 
 @pytest.fixture
-def headers(client: TestClient) -> dict[str, str]:
+def clock(monkeypatch: pytest.MonkeyPatch) -> Clock:
+    clock = Clock()
+    for module in (economy, sessions_api):
+        monkeypatch.setattr(module, "utcnow", lambda: clock.now)
+    return clock
+
+
+@pytest.fixture
+def headers(client: TestClient, clock: Clock) -> dict[str, str]:
     headers = auth_headers(register(client))
-    earn(client, headers, 100)
+    earn(client, headers, 200)
     return headers
 
 
-def buy(client: TestClient, headers: dict[str, str], reward_id: int) -> dict:
-    response = client.post(f"{API}/rewards/{reward_id}/purchase", headers=headers)
+def buy(client: TestClient, headers: dict[str, str], reward_id: int, queue: bool = True) -> dict:
+    response = client.post(
+        f"{API}/rewards/{reward_id}/purchase?queue={str(queue).lower()}", headers=headers
+    )
     assert response.status_code == 200, response.text
     return response.json()
 
@@ -28,15 +52,23 @@ def active(client: TestClient, headers: dict[str, str]) -> list[dict]:
     return client.get(f"{API}/reward-sessions/active", headers=headers).json()
 
 
-def test_purchase_with_duration_starts_session(client: TestClient, headers: dict[str, str]) -> None:
+def timeline(client: TestClient, headers: dict[str, str]) -> list[tuple[str, str, str]]:
+    return [(s["name"], s["started_at"], s["ends_at"]) for s in active(client, headers)]
+
+
+def finish(client: TestClient, headers: dict[str, str], session_id: int) -> int:
+    return client.post(f"{API}/reward-sessions/{session_id}/finish", headers=headers).status_code
+
+
+def test_purchase_with_duration_starts_session(
+    client: TestClient, headers: dict[str, str], clock: Clock
+) -> None:
     reward = create_reward(client, headers, 20, name="ТикТок", duration_minutes=20)
 
-    body = buy(client, headers, reward["id"])
+    session = buy(client, headers, reward["id"])["session"]
 
-    session = body["session"]
     assert (session["name"], session["reward_id"]) == ("ТикТок", reward["id"])
-    started = datetime.fromisoformat(session["started_at"])
-    assert datetime.fromisoformat(session["ends_at"]) - started == timedelta(minutes=20)
+    assert (session["started_at"], session["ends_at"]) == (clock.at(0), clock.at(20))
     assert session["finished_at"] is None
     assert [s["id"] for s in active(client, headers)] == [session["id"]]
 
@@ -56,53 +88,131 @@ def test_name_is_kept_after_rename(client: TestClient, headers: dict[str, str]) 
     assert active(client, headers)[0]["name"] == "Сериал"
 
 
-def test_active_sorted_and_expired_hidden(
-    client: TestClient, db: Session, headers: dict[str, str]
+# --- очередь ---
+
+
+def test_queue_chains_purchases(client: TestClient, headers: dict[str, str], clock: Clock) -> None:
+    """Два ТикТока по 15 минут — 30 минут подряд, а не параллельно."""
+    tiktok = create_reward(client, headers, 10, name="ТикТок", duration_minutes=15)
+    series = create_reward(client, headers, 10, name="Сериал", duration_minutes=45)
+
+    buy(client, headers, tiktok["id"])
+    clock.now = T0 + timedelta(minutes=5)
+    buy(client, headers, tiktok["id"])
+    buy(client, headers, series["id"])
+
+    assert timeline(client, headers) == [
+        ("ТикТок", clock.at(0), clock.at(15)),
+        ("ТикТок", clock.at(15), clock.at(30)),
+        ("Сериал", clock.at(30), clock.at(75)),
+    ]
+
+
+def test_parallel_purchase_starts_now(
+    client: TestClient, headers: dict[str, str], clock: Clock
 ) -> None:
-    long = create_reward(client, headers, 10, name="Игры", duration_minutes=120)
-    short = create_reward(client, headers, 10, name="ТикТок", duration_minutes=15)
-    expired = create_reward(client, headers, 10, name="Кофе", duration_minutes=10)
-    long_id = buy(client, headers, long["id"])["session"]["id"]
-    short_id = buy(client, headers, short["id"])["session"]["id"]
-    expired_id = buy(client, headers, expired["id"])["session"]["id"]
-    # Время «Кофе» уже вышло.
-    session = db.get(RewardSession, expired_id)
-    session.started_at -= timedelta(minutes=11)
-    session.ends_at -= timedelta(minutes=11)
-    db.flush()
+    tiktok = create_reward(client, headers, 10, name="ТикТок", duration_minutes=15)
+    series = create_reward(client, headers, 10, name="Сериал", duration_minutes=45)
 
-    assert [s["id"] for s in active(client, headers)] == [short_id, long_id]
+    buy(client, headers, series["id"])
+    clock.now = T0 + timedelta(minutes=5)
+    buy(client, headers, tiktok["id"], queue=False)
+    # Следующий в очередь — за последней из идущих, то есть за сериалом.
+    buy(client, headers, tiktok["id"])
+
+    assert timeline(client, headers) == [
+        ("Сериал", clock.at(0), clock.at(45)),
+        ("ТикТок", clock.at(5), clock.at(20)),
+        ("ТикТок", clock.at(45), clock.at(60)),
+    ]
 
 
-def test_finish_early(client: TestClient, db: Session, headers: dict[str, str]) -> None:
-    reward = create_reward(client, headers, 30, duration_minutes=30)
-    session = buy(client, headers, reward["id"])["session"]
+def test_queue_after_expired_starts_now(
+    client: TestClient, headers: dict[str, str], clock: Clock
+) -> None:
+    tiktok = create_reward(client, headers, 10, name="ТикТок", duration_minutes=15)
+    buy(client, headers, tiktok["id"])
+    clock.now = T0 + timedelta(minutes=20)  # первый уже закончился
 
-    finished = client.post(f"{API}/reward-sessions/{session['id']}/finish", headers=headers)
-    assert finished.status_code == 200
-    assert finished.json()["finished_at"] is not None
-    assert active(client, headers) == []
+    session = buy(client, headers, tiktok["id"])["session"]
+
+    assert session["started_at"] == clock.at(20)
+    assert timeline(client, headers) == [("ТикТок", clock.at(20), clock.at(35))]
+
+
+def test_finish_early_pulls_queue_forward(
+    client: TestClient, headers: dict[str, str], clock: Clock
+) -> None:
+    tiktok = create_reward(client, headers, 10, name="ТикТок", duration_minutes=15)
+    series = create_reward(client, headers, 10, name="Сериал", duration_minutes=45)
+    first = buy(client, headers, tiktok["id"])["session"]
+    buy(client, headers, tiktok["id"])
+    buy(client, headers, series["id"])
+
+    clock.now = T0 + timedelta(minutes=10)
+    assert finish(client, headers, first["id"]) == 200
+
+    # Второй ТикТок начинается сразу, сериал — за ним, длительности сохранены.
+    assert timeline(client, headers) == [
+        ("ТикТок", clock.at(10), clock.at(25)),
+        ("Сериал", clock.at(25), clock.at(70)),
+    ]
     # Монеты не возвращаются.
-    assert client.get(f"{API}/me", headers=headers).json()["balance"] == 70
-
-    again = client.post(f"{API}/reward-sessions/{session['id']}/finish", headers=headers)
-    assert again.status_code == 409
+    assert client.get(f"{API}/me", headers=headers).json()["balance"] == 170
 
 
-def test_finish_expired_or_foreign(
-    client: TestClient, db: Session, headers: dict[str, str]
+def test_cancel_waiting_pulls_later_forward(
+    client: TestClient, headers: dict[str, str], clock: Clock
+) -> None:
+    tiktok = create_reward(client, headers, 10, name="ТикТок", duration_minutes=15)
+    series = create_reward(client, headers, 10, name="Сериал", duration_minutes=45)
+    buy(client, headers, tiktok["id"])
+    waiting = buy(client, headers, tiktok["id"])["session"]
+    buy(client, headers, series["id"])
+
+    clock.now = T0 + timedelta(minutes=5)
+    assert finish(client, headers, waiting["id"]) == 200
+
+    assert timeline(client, headers) == [
+        ("ТикТок", clock.at(0), clock.at(15)),
+        ("Сериал", clock.at(15), clock.at(60)),
+    ]
+
+
+def test_finish_parallel_does_not_pull_past_running(
+    client: TestClient, headers: dict[str, str], clock: Clock
+) -> None:
+    """Очередь стоит за самой долгой из идущих: досрочный конец короткой её не сдвигает."""
+    tiktok = create_reward(client, headers, 10, name="ТикТок", duration_minutes=15)
+    series = create_reward(client, headers, 10, name="Сериал", duration_minutes=45)
+    buy(client, headers, series["id"])
+    short = buy(client, headers, tiktok["id"], queue=False)["session"]
+    buy(client, headers, tiktok["id"])  # в очереди с 45-й минуты
+
+    clock.now = T0 + timedelta(minutes=5)
+    assert finish(client, headers, short["id"]) == 200
+
+    assert timeline(client, headers) == [
+        ("Сериал", clock.at(0), clock.at(45)),
+        ("ТикТок", clock.at(45), clock.at(60)),
+    ]
+
+
+def test_finish_twice_expired_or_foreign(
+    client: TestClient, db: Session, headers: dict[str, str], clock: Clock
 ) -> None:
     reward = create_reward(client, headers, 10, duration_minutes=5)
     session_id = buy(client, headers, reward["id"])["session"]["id"]
 
     stranger = auth_headers(register(client, email="stranger@example.com"))
-    foreign = client.post(f"{API}/reward-sessions/{session_id}/finish", headers=stranger)
-    assert foreign.status_code == 404
+    assert finish(client, stranger, session_id) == 404
     assert active(client, stranger) == []
 
-    session = db.get(RewardSession, session_id)
-    session.started_at -= timedelta(minutes=6)
-    session.ends_at -= timedelta(minutes=6)
-    db.flush()
-    late = client.post(f"{API}/reward-sessions/{session_id}/finish", headers=headers)
-    assert late.status_code == 409
+    clock.now = T0 + timedelta(minutes=6)
+    assert finish(client, headers, session_id) == 409
+    assert active(client, headers) == []
+
+    other = buy(client, headers, reward["id"])["session"]
+    assert finish(client, headers, other["id"]) == 200
+    assert finish(client, headers, other["id"]) == 409
+    assert db.get(RewardSession, other["id"]).finished_at == clock.now
