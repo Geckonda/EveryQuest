@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { computed, onUnmounted, ref, watch } from 'vue'
-import { NButton, NPopover, useMessage } from 'naive-ui'
-import { errorMessage } from '@/api/errors'
+import { computed, onUnmounted, watch } from 'vue'
+import { NPopover, useMessage } from 'naive-ui'
 import { useNow } from '@/composables/useNow'
 import { useSessionsStore } from '@/stores/sessions'
 import { countdown } from '@/utils/format'
 import { playSound } from '@/utils/sound'
+import SessionList from './SessionList.vue'
 
 /** Идущие траты в шапке: ближайшая — на плашке, все — во всплывающем списке. */
 const sessions = useSessionsStore()
@@ -51,21 +51,6 @@ watch(
 )
 
 onUnmounted(() => timers.forEach(clearTimeout))
-
-const finishingId = ref<number | null>(null)
-
-async function finish(id: number, name: string) {
-  finishingId.value = id
-  try {
-    await sessions.finish(id)
-    message.success(`«${name}» — закончили раньше. Похвально!`)
-  } catch (e) {
-    message.error(errorMessage(e))
-    await sessions.load().catch(() => {})
-  } finally {
-    finishingId.value = null
-  }
-}
 </script>
 
 <template>
@@ -84,23 +69,7 @@ async function finish(id: number, name: string) {
       </button>
     </template>
 
-    <ul class="list">
-      <li v-for="row in rows" :key="row.id">
-        <div class="row-head">
-          <span class="row-name">{{ row.name }}</span>
-          <span class="num row-left">{{ row.timer.left }}</span>
-        </div>
-        <div class="bar" :style="{ '--remaining': row.timer.remaining }"><span /></div>
-        <NButton
-          size="tiny"
-          quaternary
-          :loading="finishingId === row.id"
-          @click="finish(row.id, row.name)"
-        >
-          Закончить раньше
-        </NButton>
-      </li>
-    </ul>
+    <SessionList />
   </NPopover>
 </template>
 
@@ -146,50 +115,6 @@ async function finish(id: number, name: string) {
   font-size: 0.8rem;
 }
 
-.list {
-  min-width: 220px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.list li + li {
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px dashed var(--color-rule);
-}
-
-.row-head {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  font-weight: 700;
-}
-
-.row-name {
-  overflow-wrap: anywhere;
-}
-
-.row-left {
-  color: var(--color-gold);
-}
-
-.bar {
-  height: 4px;
-  margin: 6px 0 4px;
-  border-radius: 2px;
-  background: var(--color-rule);
-}
-
-.bar span {
-  display: block;
-  width: calc(var(--remaining) * 100%);
-  height: 100%;
-  border-radius: inherit;
-  background: var(--color-gold);
-  transition: width 1s linear;
-}
-
 @keyframes pulse {
   to {
     opacity: 0.4;
@@ -213,10 +138,6 @@ async function finish(id: number, name: string) {
 @media (prefers-reduced-motion: reduce) {
   .session.critical .hourglass {
     animation: none;
-  }
-
-  .bar span {
-    transition: none;
   }
 }
 </style>

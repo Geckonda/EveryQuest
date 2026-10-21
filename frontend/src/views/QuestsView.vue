@@ -1,13 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { NAlert, NButton, NEmpty, NSpin, NTabPane, NTabs, useDialog, useMessage } from 'naive-ui'
+import { NAlert, NButton, NEmpty, NSpin, NTabPane, NTabs, useMessage } from 'naive-ui'
 import type { Quest } from '@/api/types'
 import { errorMessage } from '@/api/errors'
-import { coins } from '@/utils/format'
 import { filterQuests } from '@/utils/questFilters'
 import { useQuestFilters } from '@/composables/useQuestFilters'
-import { useNow } from '@/composables/useNow'
-import { flyCoins, pointOf, purseElement } from '@/utils/coinFx'
+import { useQuestActions, useQuestNow } from '@/composables/useQuestActions'
 import { useCatalogStore } from '@/stores/catalog'
 import { useQuestsStore } from '@/stores/quests'
 import { useRecurringStore } from '@/stores/recurring'
@@ -20,28 +18,19 @@ const catalog = useCatalogStore()
 const quests = useQuestsStore()
 const recurring = useRecurringStore()
 const message = useMessage()
-const dialog = useDialog()
+const { busyId, complete, fail, archive } = useQuestActions()
 
 const loading = ref(true)
 const loadError = ref<string | null>(null)
 const historyLoaded = ref(false)
 const historyLoading = ref(false)
 const recurringLoading = ref(false)
-const busyId = ref<number | null>(null)
 
 const modal = ref(false)
 const edited = ref<Quest | null>(null)
 
 // Тикающее «сейчас»: отсчёт на карточках и пометка просроченных без перезагрузки.
-// Посекундно — только пока у какого-то квеста идёт последний час.
-const HOUR_MS = 60 * 60 * 1000
-const now = useNow((current) =>
-  quests.active.some((q) => {
-    if (!q.due_at) return false
-    const left = new Date(q.due_at).getTime() - current.getTime()
-    return left > 0 && left < HOUR_MS
-  }),
-)
+const now = useQuestNow()
 
 onMounted(async () => {
   try {
@@ -81,65 +70,6 @@ async function onTabChange(tab: string) {
 function open(quest: Quest | null) {
   edited.value = quest
   modal.value = true
-}
-
-async function complete(quest: Quest, event: MouseEvent) {
-  // Точка старта — до запроса: после него карточка уйдёт с доски.
-  const from = pointOf(event.currentTarget as Element | null)
-  busyId.value = quest.id
-  try {
-    await quests.complete(quest.id)
-    flyCoins(from, purseElement())
-    message.success(`Квест «${quest.name}» сдан. Награда: ${coins(quest.reward)}`)
-  } catch (e) {
-    message.error(errorMessage(e))
-    await quests.loadActive().catch(() => {})
-  } finally {
-    busyId.value = null
-  }
-}
-
-function fail(quest: Quest) {
-  dialog.error({
-    title: 'Признать квест проваленным?',
-    content: quest.penalty
-      ? `«${quest.name}» уйдёт в архив, гильдия взыщет штраф: ${coins(quest.penalty)}.`
-      : `«${quest.name}» уйдёт в архив. Штрафа за него нет.`,
-    positiveText: 'Провалить',
-    negativeText: 'Отмена',
-    onPositiveClick: async () => {
-      busyId.value = quest.id
-      try {
-        await quests.fail(quest.id)
-        message.warning(
-          quest.penalty
-            ? `Квест «${quest.name}» провален. Штраф: ${coins(quest.penalty)}`
-            : `Квест «${quest.name}» провален`,
-        )
-      } catch (e) {
-        message.error(errorMessage(e))
-        await quests.loadActive().catch(() => {})
-      } finally {
-        busyId.value = null
-      }
-    },
-  })
-}
-
-function archive(quest: Quest) {
-  dialog.warning({
-    title: 'Снять объявление с доски?',
-    content: `«${quest.name}» исчезнет без награды и без штрафа.`,
-    positiveText: 'Снять',
-    negativeText: 'Отмена',
-    onPositiveClick: async () => {
-      try {
-        await quests.update(quest.id, { status: 'archived' })
-      } catch (e) {
-        message.error(errorMessage(e))
-      }
-    },
-  })
 }
 
 const tierOf = (quest: Quest) => catalog.tiers.find((t) => t.id === quest.tier_id)

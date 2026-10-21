@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import HomeView from '../views/HomeView.vue'
+import TodayView from '../views/TodayView.vue'
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -14,8 +14,13 @@ const router = createRouter({
   routes: [
     {
       path: '/',
-      name: 'home',
-      component: HomeView,
+      name: 'today',
+      component: TodayView,
+    },
+    {
+      path: '/quests',
+      name: 'quests',
+      component: () => import('../views/QuestsView.vue'),
     },
     {
       path: '/rewards',
@@ -51,7 +56,7 @@ router.beforeEach(async (to) => {
   const auth = useAuthStore()
 
   if (to.meta.guestOnly) {
-    return auth.isAuthenticated ? { name: 'home' } : true
+    return auth.isAuthenticated ? { name: 'today' } : true
   }
   if (!auth.isAuthenticated) {
     return { name: 'login', query: { redirect: to.fullPath } }

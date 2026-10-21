@@ -163,6 +163,15 @@ export interface BalanceChange {
   balance: number
 }
 
+/** Итог дня по часовому поясу профиля; manual может быть отрицательным. */
+export interface DaySummary {
+  date: string
+  earned: number
+  spent: number
+  penalties: number
+  manual: number
+}
+
 /** Идущая трата с длительностью: «ТикТок на 20 минут». */
 export interface RewardSession {
   id: number
