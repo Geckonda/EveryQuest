@@ -13,36 +13,64 @@ describe('auth store', () => {
   })
   afterEach(() => vi.unstubAllGlobals())
 
-  it('login сохраняет токены и загружает профиль', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi
-        .fn<typeof fetch>()
-        .mockResolvedValueOnce(json(200, { access_token: 'a', refresh_token: 'r' }))
-        .mockResolvedValueOnce(json(200, { id: 1, username: 'Hero', balance: 0 })),
-    )
+  it('login держит access-токен в памяти, а не в localStorage', async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(json(200, { access_token: 'a', token_type: 'bearer' }))
+      .mockResolvedValueOnce(json(200, { id: 1, username: 'Hero', balance: 0 }))
+    vi.stubGlobal('fetch', fetchMock)
     const auth = useAuthStore()
 
     await auth.login('hero@example.com', 'secret-pass')
 
-    expect(auth.isAuthenticated).toBe(true)
+    expect(auth.accessToken).toBe('a')
     expect(auth.user?.username).toBe('Hero')
-    expect(localStorage.getItem('eq.refreshToken')).toBe('r')
+    expect(localStorage.length).toBe(0)
+    expect(String(fetchMock.mock.calls[0]?.[0])).toMatch(/\/auth\/login$/)
   })
 
-  it('logout очищает токены', () => {
-    localStorage.setItem('eq.refreshToken', 'r')
+  it('restore: по cookie получает токен и профиль', async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(json(200, { access_token: 'fresh', token_type: 'bearer' }))
+      .mockResolvedValueOnce(json(200, { id: 1, username: 'Hero', balance: 5 }))
+    vi.stubGlobal('fetch', fetchMock)
     const auth = useAuthStore()
-    expect(auth.isAuthenticated).toBe(true)
 
-    auth.logout()
+    expect(await auth.restore()).toBe(true)
 
-    expect(auth.isAuthenticated).toBe(false)
-    expect(localStorage.getItem('eq.refreshToken')).toBeNull()
+    expect(String(fetchMock.mock.calls[0]?.[0])).toMatch(/\/auth\/refresh$/)
+    expect(auth.user?.balance).toBe(5)
+    expect(auth.restoreAttempted).toBe(true)
+  })
+
+  it('restore без cookie — гость, попытка отмечена', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof fetch>().mockResolvedValue(json(401, { detail: 'Сессия истекла' })),
+    )
+    const auth = useAuthStore()
+
+    expect(await auth.restore()).toBe(false)
+    expect(auth.user).toBeNull()
+    expect(auth.restoreAttempted).toBe(true)
+  })
+
+  it('logout просит сервер отозвать сессию и забывает токен', async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response(null, { status: 204 }))
+    vi.stubGlobal('fetch', fetchMock)
+    const auth = useAuthStore()
+    auth.accessToken = 'a'
+    auth.user = { id: 1 } as User
+
+    await auth.logout()
+
+    expect(String(fetchMock.mock.calls[0]?.[0])).toMatch(/\/auth\/logout$/)
+    expect(auth.accessToken).toBeNull()
+    expect(auth.user).toBeNull()
   })
 
   it('параллельные refresh делают один запрос', async () => {
-    localStorage.setItem('eq.refreshToken', 'r')
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(json(200, { access_token: 'fresh' }))
     vi.stubGlobal('fetch', fetchMock)
     const auth = useAuthStore()
@@ -76,8 +104,8 @@ describe('auth store', () => {
       .mockResolvedValueOnce(json(200, { id: 1, balance: 45 }))
       .mockResolvedValueOnce(json(200, { id: 2, balance: 999 }))
     vi.stubGlobal('fetch', fetchMock)
-    localStorage.setItem('eq.accessToken', 'a')
     const auth = useAuthStore()
+    auth.accessToken = 'a'
 
     await auth.fetchMe()
     expect(auth.coinEvent).toBeNull()

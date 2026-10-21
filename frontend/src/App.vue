@@ -47,8 +47,8 @@ const navItems: { to: string; label: string; icon: IconName }[] = [
   { to: '/settings', label: 'Настройки', icon: 'settings' },
 ]
 
-function logout() {
-  auth.logout()
+async function logout() {
+  await auth.logout()
   router.push({ name: 'login' })
 }
 

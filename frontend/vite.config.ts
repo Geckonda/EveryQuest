@@ -14,7 +14,8 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/api': process.env.VITE_API_PROXY ?? 'http://localhost:8000',
+      // xfwd — передать бэкенду настоящий IP (X-Forwarded-For): по нему лимит попыток входа.
+      '/api': { target: process.env.VITE_API_PROXY ?? 'http://localhost:8000', xfwd: true },
     },
     // В Docker на Windows события файловой системы не доходят до контейнера.
     watch: { usePolling: process.env.VITE_USE_POLLING === 'true' },

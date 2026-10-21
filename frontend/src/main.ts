@@ -23,6 +23,7 @@ setAuthHandler({
   getAccessToken: () => auth.accessToken,
   refresh: auth.refresh,
   onUnauthorized: () => {
+    // Сессия уже недействительна (отозвана, истекла) — просто забываем её.
     auth.logout()
     router.push({ name: 'login', query: { redirect: router.currentRoute.value.fullPath } })
   },

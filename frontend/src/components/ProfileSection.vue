@@ -11,8 +11,10 @@ import {
   NRadioGroup,
   NSelect,
   NSwitch,
+  useDialog,
   useMessage,
 } from 'naive-ui'
+import { useRouter } from 'vue-router'
 import { errorMessage } from '@/api/errors'
 import { useAuthStore } from '@/stores/auth'
 import { penaltyFor } from '@/utils/penalty'
@@ -20,6 +22,9 @@ import { playSound, soundEnabled } from '@/utils/sound'
 import { useTheme } from '@/composables/useTheme'
 
 const auth = useAuthStore()
+const router = useRouter()
+const dialog = useDialog()
+const leavingAll = ref(false)
 const { preference } = useTheme()
 const message = useMessage()
 
@@ -50,6 +55,26 @@ const timezoneOptions = Intl.supportedValuesOf('timeZone').map((tz) => ({ label:
 const example = computed(() => (form.multiplier === null ? null : penaltyFor(50, form.multiplier)))
 
 const isComplete = computed(() => form.username.trim() !== '' && form.multiplier !== null)
+
+function confirmLogoutAll() {
+  dialog.warning({
+    title: 'Выйти на всех устройствах?',
+    content: 'Все сессии будут закрыты сразу — на телефоне, ноутбуке и здесь.',
+    positiveText: 'Выйти везде',
+    negativeText: 'Отмена',
+    onPositiveClick: async () => {
+      leavingAll.value = true
+      try {
+        await auth.logoutAll()
+        router.push({ name: 'login' })
+      } catch (e) {
+        message.error(errorMessage(e))
+      } finally {
+        leavingAll.value = false
+      }
+    },
+  })
+}
 
 async function save() {
   if (!isComplete.value || form.multiplier === null) return
@@ -123,6 +148,15 @@ async function save() {
         Послушать
       </NButton>
     </div>
+
+    <h3 class="device-title">Безопасность</h3>
+    <p class="hint">
+      Потеряли телефон или входили с чужого компьютера — выйдите везде. Войти заново придётся и
+      здесь.
+    </p>
+    <NButton secondary type="error" :loading="leavingAll" @click="confirmLogoutAll">
+      Выйти на всех устройствах
+    </NButton>
   </NForm>
 </template>
 

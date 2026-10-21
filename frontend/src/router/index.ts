@@ -60,19 +60,14 @@ const router = createRouter({
 router.beforeEach(async (to) => {
   const auth = useAuthStore()
 
+  // Первый переход после загрузки страницы: токена в памяти нет — пробуем cookie.
+  if (!auth.user && !auth.restoreAttempted) await auth.restore()
+
   if (to.meta.guestOnly) {
-    return auth.isAuthenticated ? { name: 'today' } : true
-  }
-  if (!auth.isAuthenticated) {
-    return { name: 'login', query: { redirect: to.fullPath } }
+    return auth.user ? { name: 'today' } : true
   }
   if (!auth.user) {
-    try {
-      await auth.fetchMe()
-    } catch {
-      // 401 после неудачного refresh уже разлогинил пользователя; иначе — сетевая ошибка.
-      if (!auth.isAuthenticated) return { name: 'login', query: { redirect: to.fullPath } }
-    }
+    return { name: 'login', query: { redirect: to.fullPath } }
   }
   return true
 })

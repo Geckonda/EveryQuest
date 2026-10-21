@@ -1,6 +1,6 @@
-export interface TokenPair {
+/** Refresh-токен в теле не приходит — он в httpOnly-cookie. */
+export interface AccessToken {
   access_token: string
-  refresh_token: string
   token_type: string
 }
 

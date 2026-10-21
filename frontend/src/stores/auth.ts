@@ -1,28 +1,14 @@
-import { computed, ref } from 'vue'
+import { ref } from 'vue'
 import { defineStore } from 'pinia'
 import { API_PREFIX, api } from '@/api/client'
-import type { RegisterPayload, TokenPair, User, UserPayload } from '@/api/types'
+import type { AccessToken, RegisterPayload, User, UserPayload } from '@/api/types'
 
-const ACCESS_KEY = 'eq.accessToken'
-const REFRESH_KEY = 'eq.refreshToken'
-
-// localStorage может быть недоступен (приватный режим) — тогда сессия живёт до перезагрузки.
-const storage = {
-  get(key: string): string | null {
-    try {
-      return localStorage.getItem(key)
-    } catch {
-      return null
-    }
-  },
-  set(key: string, value: string | null): void {
-    try {
-      if (value === null) localStorage.removeItem(key)
-      else localStorage.setItem(key, value)
-    } catch {
-      /* ignore */
-    }
-  },
+// До перехода на httpOnly-cookie токены лежали в localStorage — подчищаем следы.
+try {
+  localStorage.removeItem('eq.accessToken')
+  localStorage.removeItem('eq.refreshToken')
+} catch {
+  /* приватный режим */
 }
 
 /** Почему изменился баланс: от этого зависят звук и анимация кошелька. */
@@ -35,9 +21,12 @@ export interface CoinEvent {
   reason: CoinReason
 }
 
+/**
+ * Вход. Refresh-токен — в httpOnly-cookie, скрипт его не видит; access-токен (15 минут)
+ * живёт только в памяти. После перезагрузки страницы сессия восстанавливается по cookie.
+ */
 export const useAuthStore = defineStore('auth', () => {
-  const accessToken = ref(storage.get(ACCESS_KEY))
-  const refreshToken = ref(storage.get(REFRESH_KEY))
+  const accessToken = ref<string | null>(null)
   const user = ref<User | null>(null)
   /** Последнее изменение баланса; null — ещё не было. */
   const coinEvent = ref<CoinEvent | null>(null)
@@ -47,34 +36,17 @@ export const useAuthStore = defineStore('auth', () => {
     if (delta !== 0) coinEvent.value = { id: ++coinEventId, delta, reason }
   }
 
-  const isAuthenticated = computed(() => refreshToken.value !== null)
-
-  function setAccessToken(token: string | null) {
-    accessToken.value = token
-    storage.set(ACCESS_KEY, token)
-  }
-
-  function setTokens(pair: TokenPair | null) {
-    setAccessToken(pair?.access_token ?? null)
-    refreshToken.value = pair?.refresh_token ?? null
-    storage.set(REFRESH_KEY, refreshToken.value)
-  }
-
   // Несколько запросов могут получить 401 одновременно — обновляем токен один раз.
   let refreshing: Promise<boolean> | null = null
 
+  /** Новый access-токен по cookie. Cookie при этом тоже меняется (ротация на сервере). */
   function refresh(): Promise<boolean> {
-    if (!refreshToken.value) return Promise.resolve(false)
     refreshing ??= (async () => {
       try {
         // Напрямую через fetch: api.post при 401 сам вызвал бы refresh.
-        const response = await fetch(`${API_PREFIX}/auth/refresh`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ refresh_token: refreshToken.value }),
-        })
+        const response = await fetch(`${API_PREFIX}/auth/refresh`, { method: 'POST' })
         if (!response.ok) return false
-        setAccessToken((await response.json()).access_token)
+        accessToken.value = ((await response.json()) as AccessToken).access_token
         return true
       } catch {
         return false
@@ -85,13 +57,36 @@ export const useAuthStore = defineStore('auth', () => {
     return refreshing
   }
 
+  /** Пробовали ли уже восстановить сессию после загрузки страницы. */
+  const restoreAttempted = ref(false)
+  let restoring: Promise<boolean> | null = null
+
+  /** Восстановить вход после перезагрузки: cookie → access-токен → профиль. */
+  function restore(): Promise<boolean> {
+    restoring ??= (async () => {
+      try {
+        if (!accessToken.value && !(await refresh())) return false
+        await fetchMe()
+        return true
+      } catch {
+        return false
+      } finally {
+        restoreAttempted.value = true
+        restoring = null
+      }
+    })()
+    return restoring
+  }
+
   async function login(email: string, password: string) {
-    setTokens(await api.post<TokenPair>('/auth/login', { email, password }))
+    accessToken.value = (
+      await api.post<AccessToken>('/auth/login', { email, password })
+    ).access_token
     await fetchMe()
   }
 
   async function register(payload: RegisterPayload) {
-    setTokens(await api.post<TokenPair>('/auth/register', payload))
+    accessToken.value = (await api.post<AccessToken>('/auth/register', payload)).access_token
     await fetchMe()
   }
 
@@ -107,9 +102,22 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = await api.patch<User>('/me', payload)
   }
 
-  function logout() {
-    setTokens(null)
+  function forget() {
+    accessToken.value = null
     user.value = null
+  }
+
+  /** Выйти на этом устройстве: сервер отзывает сессию и удаляет cookie. */
+  async function logout() {
+    // Напрямую через fetch: при истёкшем access-токене api.post ушёл бы в refresh.
+    await fetch(`${API_PREFIX}/auth/logout`, { method: 'POST' }).catch(() => {})
+    forget()
+  }
+
+  /** Выйти на всех устройствах — в том числе на этом. */
+  async function logoutAll() {
+    await api.post('/auth/logout-all')
+    forget()
   }
 
   /** Баланс из ответа операции с монетами — без лишнего запроса /me. */
@@ -121,16 +129,17 @@ export const useAuthStore = defineStore('auth', () => {
 
   return {
     accessToken,
-    refreshToken,
     user,
     coinEvent,
-    isAuthenticated,
+    restoreAttempted,
     refresh,
+    restore,
     login,
     register,
     fetchMe,
     updateMe,
     logout,
+    logoutAll,
     setBalance,
   }
 })
