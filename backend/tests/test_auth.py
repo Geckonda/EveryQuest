@@ -1,7 +1,7 @@
 from fastapi.testclient import TestClient
 
 from app.defaults import DEFAULT_CATEGORIES, DEFAULT_TIERS
-from app.security import create_token
+from app.security import create_access_token
 from tests.conftest import auth_headers, register
 
 
@@ -60,22 +60,22 @@ def test_login(client: TestClient) -> None:
     assert unknown.status_code == 401
 
 
-def test_refresh(client: TestClient) -> None:
-    tokens = register(client)
+def test_register_and_login_set_refresh_cookie(client: TestClient) -> None:
+    """Refresh-токен — только в httpOnly-cookie, в теле ответа его нет."""
+    response = client.post(
+        "/api/v1/auth/register",
+        json={"email": "hero@example.com", "username": "Hero", "password": "secret-pass"},
+    )
+    assert "refresh_token" not in response.json()
+    cookie = response.headers["set-cookie"]
+    assert cookie.startswith("eq_refresh=")
+    for flag in ("HttpOnly", "Path=/api/v1/auth", "SameSite=strict"):
+        assert flag in cookie, flag
 
-    response = client.post("/api/v1/auth/refresh", json={"refresh_token": tokens["refresh_token"]})
-    assert response.status_code == 200
-    assert client.get("/api/v1/me", headers=auth_headers(response.json())).status_code == 200
-
-    # access-токен не годится как refresh
-    response = client.post("/api/v1/auth/refresh", json={"refresh_token": tokens["access_token"]})
-    assert response.status_code == 401
-
-
-def test_refresh_token_is_not_access_token(client: TestClient) -> None:
-    tokens = register(client)
-    headers = {"Authorization": f"Bearer {tokens['refresh_token']}"}
-    assert client.get("/api/v1/me", headers=headers).status_code == 401
+    login = client.post(
+        "/api/v1/auth/login", json={"email": "hero@example.com", "password": "secret-pass"}
+    )
+    assert login.headers["set-cookie"].startswith("eq_refresh=")
 
 
 def test_protected_endpoints_require_token(client: TestClient) -> None:
@@ -84,8 +84,8 @@ def test_protected_endpoints_require_token(client: TestClient) -> None:
         assert client.get(path, headers={"Authorization": "Bearer garbage"}).status_code == 401
 
 
-def test_token_of_missing_user_rejected(client: TestClient) -> None:
-    headers = {"Authorization": f"Bearer {create_token(999_999, 'access')}"}
+def test_token_of_missing_session_rejected(client: TestClient) -> None:
+    headers = {"Authorization": f"Bearer {create_access_token(999_999, 999_999)}"}
     assert client.get("/api/v1/me", headers=headers).status_code == 401
 
 

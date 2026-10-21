@@ -159,8 +159,10 @@ REST под префиксом `/api/v1`. Все ресурсы, кроме auth
 | Метод | Путь | Что делает |
 | --- | --- | --- |
 | POST | `/auth/register` | Регистрация + копирование шаблонов тиров и категорий |
-| POST | `/auth/login` | Выдаёт access и refresh токены |
-| POST | `/auth/refresh` | Новый access токен |
+| POST | `/auth/login` | Access-токен в ответе, refresh — в httpOnly-cookie; лимит попыток |
+| POST | `/auth/refresh` | Новый access-токен по cookie, refresh-токен ротируется |
+| POST | `/auth/logout` | Выйти на этом устройстве |
+| POST | `/auth/logout-all` | Выйти на всех устройствах |
 | GET / PATCH | `/me` | Профиль, баланс, часовой пояс |
 | GET / POST | `/tiers` | Список, создание |
 | PATCH | `/tiers/{id}` | Изменение, архивация (409, если есть активные квесты) |

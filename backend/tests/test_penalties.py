@@ -251,6 +251,7 @@ def job_calls(monkeypatch: pytest.MonkeyPatch) -> list[str]:
     calls: list[str] = []
     monkeypatch.setattr(scheduler_module, "apply_penalties", lambda db, now: calls.append("p"))
     monkeypatch.setattr(scheduler_module, "generate_recurring", lambda db, now: calls.append("g"))
+    monkeypatch.setattr(scheduler_module, "purge_auth", lambda db, now: calls.append("c"))
     return calls
 
 
@@ -265,7 +266,7 @@ def test_run_jobs_skipped_while_another_process_holds_lock(
         other.commit()
 
     assert run_jobs(engine) is True
-    assert job_calls == ["p", "g"]  # сначала штрафы, потом генерация
+    assert job_calls == ["p", "g", "c"]  # штрафы, генерация, уборка
     assert try_lock(engine)  # после прогона блокировка свободна
 
 

@@ -5,14 +5,15 @@
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import delete, or_, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from app.economy import lock_quest, lock_user, record_transaction
-from app.models import Quest, RecurringQuest, User
+from app.models import AuthSession, Quest, RecurringQuest, User
+from app.ratelimit import purge_old
 from app.recurrence import due_at_for, local_today, period_for
 
 logger = logging.getLogger(__name__)
@@ -114,3 +115,26 @@ def apply_penalties(db: Session, now: datetime) -> int:
     if penalized:
         logger.info("Штрафы: провалено квестов — %d", penalized)
     return penalized
+
+
+# Отозванная сессия ещё сутки нужна, чтобы распознать повтор украденного токена.
+KEEP_REVOKED_SESSIONS = timedelta(days=1)
+
+
+def purge_auth(db: Session, now: datetime) -> int:
+    """Удаляет истёкшие и давно отозванные сессии и старые попытки входа."""
+    result = db.execute(
+        delete(AuthSession)
+        .where(
+            or_(
+                AuthSession.expires_at < now,
+                AuthSession.revoked_at < now - KEEP_REVOKED_SESSIONS,
+            )
+        )
+        .returning(AuthSession.id)
+    )
+    removed = len(result.all()) + purge_old(db)
+    db.commit()
+    if removed:
+        logger.info("Уборка: удалено сессий и попыток входа — %d", removed)
+    return removed

@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.db import engine as default_engine
 from app.economy import utcnow
-from app.jobs import apply_penalties, generate_recurring
+from app.jobs import apply_penalties, generate_recurring, purge_auth
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +44,8 @@ def run_jobs(bind: Engine | None = None) -> bool:
                 apply_penalties(db, now)
             with Session(bind, expire_on_commit=False) as db:
                 generate_recurring(db, now)
+            with Session(bind, expire_on_commit=False) as db:
+                purge_auth(db, now)
         finally:
             lock.execute(text("SELECT pg_advisory_unlock(:key)"), {"key": JOBS_LOCK_KEY})
             lock.commit()

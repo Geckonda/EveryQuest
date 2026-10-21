@@ -1,13 +1,12 @@
+import hashlib
+import secrets
 from datetime import UTC, datetime, timedelta
-from typing import Literal
 
 import jwt
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError
 
 from app.config import settings
-
-TokenType = Literal["access", "refresh"]
 
 _ALGORITHM = "HS256"
 _hasher = PasswordHasher()
@@ -34,26 +33,38 @@ def verify_password(password_hash: str | None, password: str) -> bool:
     return _verify(password_hash, password)
 
 
-def create_token(user_id: int, token_type: TokenType) -> str:
+def create_access_token(user_id: int, session_id: int) -> str:
+    """Короткоживущий JWT; sid — сессия, по которой его выдали (её можно отозвать)."""
     now = datetime.now(UTC)
-    ttl = (
-        timedelta(minutes=settings.jwt_access_ttl_minutes)
-        if token_type == "access"
-        else timedelta(days=settings.jwt_refresh_ttl_days)
-    )
-    payload = {"sub": str(user_id), "type": token_type, "iat": now, "exp": now + ttl}
+    payload = {
+        "sub": str(user_id),
+        "sid": session_id,
+        "type": "access",
+        "iat": now,
+        "exp": now + timedelta(minutes=settings.jwt_access_ttl_minutes),
+    }
     return jwt.encode(payload, settings.jwt_secret, algorithm=_ALGORITHM)
 
 
-def decode_token(token: str, expected_type: TokenType) -> int | None:
-    """Возвращает id пользователя или None, если токен невалиден, истёк или другого типа."""
+def decode_access_token(token: str) -> tuple[int, int] | None:
+    """(id пользователя, id сессии) или None, если токен невалиден или истёк."""
     try:
         payload = jwt.decode(token, settings.jwt_secret, algorithms=[_ALGORITHM])
     except jwt.PyJWTError:
         return None
-    if payload.get("type") != expected_type:
+    if payload.get("type") != "access":
         return None
     try:
-        return int(payload["sub"])
-    except (KeyError, ValueError):
+        return int(payload["sub"]), int(payload["sid"])
+    except (KeyError, TypeError, ValueError):
         return None
+
+
+def new_refresh_token() -> str:
+    """Refresh-токен — случайная строка, а не JWT: проверяется по базе, отзывается удалением."""
+    return secrets.token_urlsafe(32)
+
+
+def hash_token(token: str) -> str:
+    """В базе — только SHA-256: утечка дампа не даёт войти. Соль не нужна, токен случайный."""
+    return hashlib.sha256(token.encode()).hexdigest()

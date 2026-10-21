@@ -10,11 +10,13 @@ from app import models  # noqa: F401  — регистрирует таблиц�
 from app.config import settings
 from app.db import Base, get_db
 from app.main import app
-from app.models import User
+from app.models import AuthAttempt, User
 
 # Планировщик в тестах не нужен: задачи вызываются напрямую с нужным «сейчас».
 # Важно и для параллельных тестов, где каждый поток создаёт свой TestClient.
 settings.scheduler_enabled = False
+# TestClient ходит по http://testserver — Secure-cookie с refresh-токеном он бы не отправил.
+settings.cookie_secure = False
 
 _MAIN_URL = make_url(settings.database_url)
 TEST_DB_URL = _MAIN_URL.set(database=f"{_MAIN_URL.database}_test")
@@ -78,6 +80,8 @@ def committing_db(engine: Engine) -> Iterator[None]:
     app.dependency_overrides.clear()
     with Session(engine) as session:
         session.execute(delete(User).where(User.email.like("race-%")))
+        # Попытки регистрации копятся с одного «IP» testclient — иначе сработает лимит.
+        session.execute(delete(AuthAttempt))
         session.commit()
 
 

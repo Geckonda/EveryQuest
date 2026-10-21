@@ -56,6 +56,45 @@ class User(Base):
     created_at: Mapped[datetime] = created_at_column()
 
 
+class AuthSession(Base):
+    """Сессия входа — одно устройство. Refresh-токен хранится только хэшем.
+
+    Токен меняется при каждом обновлении (ротация). Предыдущий хэш помнится, чтобы
+    отличить гонку двух вкладок (старый токен сразу после смены) от кражи (старый
+    токен позже) — во втором случае сессия отзывается.
+    """
+
+    __tablename__ = "auth_sessions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = user_fk()
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    previous_token_hash: Mapped[str | None] = mapped_column(String(64), index=True)
+    rotated_at: Mapped[datetime | None] = mapped_column(TZDateTime)
+    user_agent: Mapped[str | None] = mapped_column(String(300))
+    created_at: Mapped[datetime] = created_at_column()
+    last_used_at: Mapped[datetime] = created_at_column()
+    expires_at: Mapped[datetime] = mapped_column(TZDateTime, nullable=False)
+    revoked_at: Mapped[datetime | None] = mapped_column(TZDateTime)
+
+
+class AuthAttempt(Base):
+    """Неудачный вход или регистрация — для ограничения частоты попыток."""
+
+    __tablename__ = "auth_attempts"
+    __table_args__ = (
+        CheckConstraint("kind IN ('login', 'register')", name="kind"),
+        Index("ix_auth_attempts_kind_ip_created_at", "kind", "ip", "created_at"),
+        Index("ix_auth_attempts_kind_email_created_at", "kind", "email", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    ip: Mapped[str] = mapped_column(String(64), nullable=False)
+    email: Mapped[str | None] = mapped_column(String(320))
+    created_at: Mapped[datetime] = created_at_column()
+
+
 class Tier(Base):
     __tablename__ = "tiers"
     __table_args__ = (CheckConstraint("level BETWEEN 1 AND 5", name="level_range"),)

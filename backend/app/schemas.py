@@ -73,17 +73,11 @@ class LoginIn(BaseModel):
     password: str
 
 
-class RefreshIn(BaseModel):
-    refresh_token: str
-
-
 class AccessToken(BaseModel):
+    """Refresh-токен в теле не отдаётся — он в httpOnly-cookie."""
+
     access_token: str
     token_type: str = "bearer"
-
-
-class TokenPair(AccessToken):
-    refresh_token: str
 
 
 # --- me ---

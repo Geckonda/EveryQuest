@@ -17,10 +17,13 @@ services:
 
   backend:
     build: ./backend
-    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    # --proxy-headers: настоящий IP клиента из X-Forwarded-For (запросы идут через прокси Vite),
+    # иначе лимит попыток входа считался бы по адресу контейнера фронта — общий для всех.
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --proxy-headers --forwarded-allow-ips='*'"
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-everyquest}:${POSTGRES_PASSWORD:-everyquest}@db:5432/${POSTGRES_DB:-everyquest}
       JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
+      ENVIRONMENT: ${ENVIRONMENT:-dev}
       WATCHFILES_FORCE_POLLING: "true"
     ports:
       - "${BACKEND_PORT:-8000}:8000"
@@ -44,6 +47,7 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-everyquest}:${POSTGRES_PASSWORD:-everyquest}@db:5432/${POSTGRES_DB:-everyquest}
       JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
+      ENVIRONMENT: ${ENVIRONMENT:-dev}
     volumes:
       - ./backend:/app
     depends_on:
