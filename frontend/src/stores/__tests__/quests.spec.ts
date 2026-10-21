@@ -20,7 +20,8 @@ const quest = (id: number, due_at: string | null, extra: Partial<Quest> = {}): Q
   status: 'active',
   created_at: '2026-10-21T00:00:00Z',
   due_at,
-  completed_at: null,
+  closed_at: null,
+  close_reason: null,
   penalty_applied: false,
   ...extra,
 })
@@ -49,7 +50,11 @@ describe('quests store', () => {
   })
 
   it('выполнение переносит квест в историю и обновляет баланс', async () => {
-    const done = quest(1, null, { status: 'completed', completed_at: '2026-10-21T12:00:00Z' })
+    const done = quest(1, null, {
+      status: 'completed',
+      closed_at: '2026-10-21T12:00:00Z',
+      close_reason: 'completed',
+    })
     vi.stubGlobal(
       'fetch',
       vi.fn<typeof fetch>().mockResolvedValue(json({ quest: done, balance: 110 })),
@@ -64,6 +69,28 @@ describe('quests store', () => {
     expect(quests.active.map((q) => q.id)).toEqual([2])
     expect(quests.history[0]?.status).toBe('completed')
     expect(auth.user?.balance).toBe(110)
+  })
+
+  it('провал списывает штраф и переносит квест в историю', async () => {
+    const failed = quest(1, null, {
+      status: 'failed',
+      closed_at: '2026-10-21T12:00:00Z',
+      close_reason: 'abandoned',
+      penalty_applied: true,
+    })
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(json({ quest: failed, balance: -5 }))
+    vi.stubGlobal('fetch', fetchMock)
+    const auth = useAuthStore()
+    auth.user = { id: 1, balance: 0 } as User
+    const quests = useQuestsStore()
+    quests.active = [quest(1, null)]
+
+    await quests.fail(1)
+
+    expect(String(fetchMock.mock.calls[0]?.[0])).toMatch(/\/quests\/1\/fail$/)
+    expect(quests.active).toEqual([])
+    expect(quests.history[0]?.close_reason).toBe('abandoned')
+    expect(auth.user?.balance).toBe(-5)
   })
 
   it('при смене пользователя списки очищаются', async () => {

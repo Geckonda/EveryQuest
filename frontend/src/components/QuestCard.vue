@@ -15,7 +15,7 @@ const props = defineProps<{
   busy?: boolean
 }>()
 
-defineEmits<{ complete: []; edit: []; archive: [] }>()
+defineEmits<{ complete: []; fail: []; edit: []; archive: [] }>()
 
 const isActive = computed(() => props.quest.status === 'active')
 const due = computed(() => (props.quest.due_at ? dueLabel(props.quest.due_at, props.now) : null))
@@ -27,6 +27,14 @@ const STAMP = {
   archived: 'Снят',
 } as const
 const stamp = computed(() => (props.quest.status === 'active' ? null : STAMP[props.quest.status]))
+
+/** Подпись под датой закрытия: почему провален. */
+const FAIL_NOTE = { expired: 'срок вышел', abandoned: 'не справился' } as const
+const failNote = computed(() =>
+  props.quest.close_reason === 'expired' || props.quest.close_reason === 'abandoned'
+    ? FAIL_NOTE[props.quest.close_reason]
+    : null,
+)
 </script>
 
 <template>
@@ -58,8 +66,11 @@ const stamp = computed(() => (props.quest.status === 'active' ? null : STAMP[pro
           <span v-else>без срока</span>
         </template>
         <template v-else>
-          <span v-if="quest.completed_at">{{ formatDateTime(quest.completed_at) }}</span>
-          <span v-else-if="quest.due_at">срок был {{ formatDateTime(quest.due_at) }}</span>
+          <span v-if="quest.closed_at">{{ formatDateTime(quest.closed_at) }}</span>
+          <span v-if="failNote">{{ quest.closed_at ? ' · ' : '' }}{{ failNote }}</span>
+          <span v-if="quest.status === 'failed' && quest.penalty" class="late num">
+            · −{{ quest.penalty }}
+          </span>
         </template>
       </div>
 
@@ -78,6 +89,15 @@ const stamp = computed(() => (props.quest.status === 'active' ? null : STAMP[pro
         </NButton>
         <NButton size="small" quaternary :disabled="due?.overdue" @click="$emit('archive')">
           Снять с доски
+        </NButton>
+        <NButton
+          size="small"
+          quaternary
+          type="error"
+          :disabled="due?.overdue || busy"
+          @click="$emit('fail')"
+        >
+          Провалить
         </NButton>
       </div>
       <p v-if="due?.overdue" class="overdue-note">

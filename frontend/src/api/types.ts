@@ -59,6 +59,9 @@ export type RewardPayload = Omit<Reward, 'id' | 'is_archived' | 'created_at'>
 
 export type QuestStatus = 'active' | 'completed' | 'failed' | 'archived'
 
+/** expired — вышел срок, abandoned — провален вручную. */
+export type CloseReason = 'completed' | 'expired' | 'abandoned' | 'archived'
+
 export interface Quest {
   id: number
   name: string
@@ -72,7 +75,8 @@ export interface Quest {
   status: QuestStatus
   created_at: string
   due_at: string | null
-  completed_at: string | null
+  closed_at: string | null
+  close_reason: CloseReason | null
   penalty_applied: boolean
 }
 
@@ -86,7 +90,8 @@ export interface QuestPayload {
   due_at: string | null
 }
 
-export interface QuestCompleted {
+/** Ответ на сдачу или провал квеста. */
+export interface QuestClosed {
   quest: Quest
   balance: number
 }

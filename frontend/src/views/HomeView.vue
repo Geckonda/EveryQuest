@@ -87,6 +87,33 @@ async function complete(quest: Quest) {
   }
 }
 
+function fail(quest: Quest) {
+  dialog.error({
+    title: 'Признать квест проваленным?',
+    content: quest.penalty
+      ? `«${quest.name}» уйдёт в архив, гильдия взыщет штраф: ${coins(quest.penalty)}.`
+      : `«${quest.name}» уйдёт в архив. Штрафа за него нет.`,
+    positiveText: 'Провалить',
+    negativeText: 'Отмена',
+    onPositiveClick: async () => {
+      busyId.value = quest.id
+      try {
+        await quests.fail(quest.id)
+        message.warning(
+          quest.penalty
+            ? `Квест «${quest.name}» провален. Штраф: ${coins(quest.penalty)}`
+            : `Квест «${quest.name}» провален`,
+        )
+      } catch (e) {
+        message.error(errorMessage(e))
+        await quests.loadActive().catch(() => {})
+      } finally {
+        busyId.value = null
+      }
+    },
+  })
+}
+
 function archive(quest: Quest) {
   dialog.warning({
     title: 'Снять объявление с доски?',
@@ -137,6 +164,7 @@ const categoryOf = (quest: Quest) => catalog.categories.find((c) => c.id === que
           :now="now"
           :busy="busyId === quest.id"
           @complete="complete(quest)"
+          @fail="fail(quest)"
           @edit="open(quest)"
           @archive="archive(quest)"
         />

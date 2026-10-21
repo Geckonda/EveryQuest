@@ -1,7 +1,7 @@
 import { ref, watch } from 'vue'
 import { defineStore } from 'pinia'
 import { api } from '@/api/client'
-import type { Quest, QuestCompleted, QuestPayload } from '@/api/types'
+import type { Quest, QuestClosed, QuestPayload } from '@/api/types'
 import { useAuthStore } from './auth'
 
 /** Активные квесты сортируются как на бэкенде: по сроку, без срока — в конце. */
@@ -50,13 +50,17 @@ export const useQuestsStore = defineStore('quests', () => {
     return quest
   }
 
-  async function complete(id: number) {
-    const result = await api.post<QuestCompleted>(`/quests/${id}/complete`)
+  /** Сдать или провалить: квест уходит в архив, баланс — из ответа. */
+  async function close(id: number, action: 'complete' | 'fail') {
+    const result = await api.post<QuestClosed>(`/quests/${id}/${action}`)
     active.value = active.value.filter((q) => q.id !== id)
     history.value = [result.quest, ...history.value]
     auth.setBalance(result.balance)
     return result.quest
   }
 
-  return { active, history, loadActive, loadHistory, create, update, complete }
+  const complete = (id: number) => close(id, 'complete')
+  const fail = (id: number) => close(id, 'fail')
+
+  return { active, history, loadActive, loadHistory, create, update, complete, fail }
 })
