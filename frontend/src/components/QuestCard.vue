@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { NButton } from 'naive-ui'
 import type { Category, Quest, Tier } from '@/api/types'
-import { dueLabel, formatDateTime, tierLabel } from '@/utils/format'
+import { countdown, dueLabel, formatDateTime, tierLabel } from '@/utils/format'
 import CoinIcon from './CoinIcon.vue'
 import TierSeal from './TierSeal.vue'
 
@@ -19,6 +19,12 @@ defineEmits<{ complete: []; fail: []; edit: []; archive: [] }>()
 
 const isActive = computed(() => props.quest.status === 'active')
 const due = computed(() => (props.quest.due_at ? dueLabel(props.quest.due_at, props.now) : null))
+/** Живой отсчёт — только у открытого квеста со сроком. */
+const timer = computed(() =>
+  isActive.value && props.quest.due_at
+    ? countdown(props.quest.created_at, props.quest.due_at, props.now)
+    : null,
+)
 
 /** Штамп на закрытом объявлении. */
 const STAMP = {
@@ -38,7 +44,10 @@ const failNote = computed(() =>
 </script>
 
 <template>
-  <article class="notice" :class="[quest.status, { overdue: due?.overdue }]">
+  <article
+    class="notice"
+    :class="[quest.status, { overdue: due?.overdue }, timer && `urgency-${timer.urgency}`]"
+  >
     <TierSeal v-if="tier" :tier="tier" class="seal" />
 
     <div class="body">
@@ -62,7 +71,10 @@ const failNote = computed(() =>
 
       <div class="when">
         <template v-if="isActive">
-          <span v-if="due" :class="{ late: due.overdue, soon: due.soon }">⌛ {{ due.text }}</span>
+          <template v-if="due">
+            <span :class="{ late: due.overdue, soon: due.soon }">⌛ {{ due.text }}</span>
+            <span v-if="timer && !due.overdue" class="left num"> · осталось {{ timer.left }}</span>
+          </template>
           <span v-else>без срока</span>
         </template>
         <template v-else>
@@ -72,6 +84,16 @@ const failNote = computed(() =>
             · −{{ quest.penalty }}
           </span>
         </template>
+      </div>
+
+      <!-- Фитиль: догорает от создания квеста до срока. -->
+      <div
+        v-if="timer && !due?.overdue"
+        class="fuse"
+        :style="{ '--remaining': timer.remaining }"
+        aria-hidden="true"
+      >
+        <span class="burn" />
       </div>
 
       <div v-if="isActive" class="actions">
@@ -237,6 +259,141 @@ const failNote = computed(() =>
 .when .late {
   color: var(--color-error);
   font-weight: 700;
+}
+
+.when .left {
+  font-weight: 700;
+}
+
+.urgency-critical .when .left {
+  color: var(--color-error);
+}
+
+.fuse {
+  position: relative;
+  height: 4px;
+  margin-top: 8px;
+  border-radius: 2px;
+  background: var(--color-rule);
+}
+
+.burn {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: calc(var(--remaining) * 100%);
+  border-radius: inherit;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--color-gold), #000 30%),
+    var(--color-gold)
+  );
+  transition: width 1s linear;
+}
+
+/* Искра на конце фитиля. */
+.burn::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: -5px;
+  width: 10px;
+  height: 10px;
+  margin-top: -5px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff6c8 0 20%, #f2a530 45%, transparent 70%);
+  animation: spark 0.5s ease-in-out infinite alternate;
+}
+
+.urgency-soon .burn {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--color-warning), #000 25%),
+    var(--color-warning)
+  );
+}
+
+.urgency-critical .burn {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--color-error), #000 25%),
+    var(--color-error)
+  );
+}
+
+/* Горит: мягкое янтарное свечение. */
+.notice.urgency-soon {
+  border-color: color-mix(in srgb, var(--color-warning), transparent 30%);
+  animation: glow-soon 2.4s ease-in-out infinite;
+}
+
+/* Вот-вот сгорит: красное пульсирующее свечение и короткая дрожь раз в несколько секунд. */
+.notice.urgency-critical {
+  border-color: var(--color-error);
+  animation:
+    glow-critical 1.2s ease-in-out infinite,
+    shake 4s ease-in-out infinite;
+}
+
+@keyframes spark {
+  from {
+    transform: scale(0.8);
+    opacity: 0.7;
+  }
+  to {
+    transform: scale(1.25);
+    opacity: 1;
+  }
+}
+
+@keyframes glow-soon {
+  50% {
+    box-shadow:
+      var(--shadow-note),
+      0 0 14px 2px color-mix(in srgb, var(--color-warning), transparent 55%);
+  }
+}
+
+@keyframes glow-critical {
+  50% {
+    box-shadow:
+      var(--shadow-note),
+      0 0 18px 4px color-mix(in srgb, var(--color-error), transparent 45%);
+  }
+}
+
+@keyframes shake {
+  0%,
+  88%,
+  100% {
+    transform: none;
+  }
+  90% {
+    transform: translateX(-3px) rotate(-0.6deg);
+  }
+  92% {
+    transform: translateX(3px) rotate(0.6deg);
+  }
+  94% {
+    transform: translateX(-2px) rotate(-0.3deg);
+  }
+  96% {
+    transform: translateX(2px);
+  }
+}
+
+/* Без анимаций — остаются цвет рамки и фитиля. */
+@media (prefers-reduced-motion: reduce) {
+  .notice.urgency-soon,
+  .notice.urgency-critical,
+  .burn::after {
+    animation: none;
+  }
+
+  .burn {
+    transition: none;
+  }
 }
 
 .actions {

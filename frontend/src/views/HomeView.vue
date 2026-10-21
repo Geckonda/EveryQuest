@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { NAlert, NButton, NEmpty, NSpin, NTabPane, NTabs, useDialog, useMessage } from 'naive-ui'
 import type { Quest } from '@/api/types'
 import { errorMessage } from '@/api/errors'
 import { coins } from '@/utils/format'
 import { filterQuests } from '@/utils/questFilters'
 import { useQuestFilters } from '@/composables/useQuestFilters'
+import { useNow } from '@/composables/useNow'
 import { useCatalogStore } from '@/stores/catalog'
 import { useQuestsStore } from '@/stores/quests'
 import { useRecurringStore } from '@/stores/recurring'
@@ -30,12 +31,18 @@ const busyId = ref<number | null>(null)
 const modal = ref(false)
 const edited = ref<Quest | null>(null)
 
-// Тикающее «сейчас»: просроченные квесты помечаются без перезагрузки страницы.
-const now = ref(new Date())
-let timer: ReturnType<typeof setInterval> | undefined
+// Тикающее «сейчас»: отсчёт на карточках и пометка просроченных без перезагрузки.
+// Посекундно — только пока у какого-то квеста идёт последний час.
+const HOUR_MS = 60 * 60 * 1000
+const now = useNow((current) =>
+  quests.active.some((q) => {
+    if (!q.due_at) return false
+    const left = new Date(q.due_at).getTime() - current.getTime()
+    return left > 0 && left < HOUR_MS
+  }),
+)
 
 onMounted(async () => {
-  timer = setInterval(() => (now.value = new Date()), 30_000)
   try {
     await Promise.all([catalog.load(), quests.loadActive()])
   } catch (e) {
@@ -44,8 +51,6 @@ onMounted(async () => {
     loading.value = false
   }
 })
-
-onUnmounted(() => clearInterval(timer))
 
 async function onTabChange(tab: string) {
   if (tab === 'recurring') {

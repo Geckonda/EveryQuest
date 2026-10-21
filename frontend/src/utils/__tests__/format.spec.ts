@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { coins, dueLabel, plural, romanLevel, signed, tierLabel } from '../format'
+import { coins, countdown, dueLabel, plural, romanLevel, signed, tierLabel } from '../format'
 
 describe('romanLevel', () => {
   it.each([
@@ -61,6 +61,50 @@ describe('signed', () => {
     expect(signed(50)).toBe('+50')
     expect(signed(-30)).toBe('−30')
     expect(signed(0)).toBe('0')
+  })
+})
+
+describe('countdown', () => {
+  const now = new Date('2026-10-21T12:00:00Z')
+  const plus = (ms: number) => new Date(now.getTime() + ms).toISOString()
+  const MIN = 60_000
+  const HOUR = 60 * MIN
+  const created = plus(-10 * 24 * HOUR) // создан 10 дней назад — доля почти не влияет
+
+  it.each([
+    [2 * 24 * HOUR + 5 * HOUR + 30 * MIN, '2 д 5 ч'],
+    [3 * HOUR + 14 * MIN + 59_000, '3 ч 14 мин'],
+    [13 * MIN + 5_000, '13:05'],
+    [59 * MIN + 59_999, '59:59'],
+    [4_000, '0:04'],
+  ])('%i мс → %s', (left, text) => {
+    expect(countdown(created, plus(left), now).left).toBe(text)
+  })
+
+  it('срочность по абсолютному времени', () => {
+    expect(countdown(created, plus(29 * MIN), now).urgency).toBe('critical')
+    expect(countdown(created, plus(2 * HOUR), now).urgency).toBe('soon')
+    expect(countdown(plus(-HOUR), plus(5 * HOUR), now).urgency).toBe('calm')
+  })
+
+  it('срочность по доле оставшегося времени', () => {
+    // Недельный квест, осталось 10% (≈17 ч) — уже горит.
+    const week = 7 * 24 * HOUR
+    const result = countdown(plus(-0.9 * week), plus(0.1 * week), now)
+    expect(result.urgency).toBe('soon')
+    expect(result.remaining).toBeCloseTo(0.1)
+  })
+
+  it('просрочен', () => {
+    expect(countdown(created, plus(-1), now)).toEqual({
+      left: '0:00',
+      urgency: 'overdue',
+      remaining: 0,
+    })
+  })
+
+  it('создан «в будущем» по часам браузера — доля не больше 1', () => {
+    expect(countdown(plus(HOUR), plus(5 * HOUR), now).remaining).toBe(1)
   })
 })
 
