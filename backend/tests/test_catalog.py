@@ -53,7 +53,7 @@ def test_create_and_update_tier(client: TestClient, headers: dict[str, str]) -> 
     created = client.post(
         f"{API}/tiers",
         headers=headers,
-        json={"name": "Эпик", "level": 5, "default_reward": 500, "default_penalty": 0},
+        json={"name": "Эпик", "level": 5, "default_reward": 500},
     )
     assert created.status_code == 201
     tier = created.json()

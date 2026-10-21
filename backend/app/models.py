@@ -1,4 +1,5 @@
 from datetime import date, datetime, time
+from decimal import Decimal
 
 from sqlalchemy import (
     ARRAY,
@@ -9,6 +10,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    Numeric,
     SmallInteger,
     String,
     Text,
@@ -35,6 +37,9 @@ def user_fk() -> Mapped[int]:
 
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = (
+        CheckConstraint("penalty_multiplier BETWEEN 0 AND 10", name="penalty_multiplier_range"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     email: Mapped[str] = mapped_column(String(320), unique=True, nullable=False)
@@ -44,6 +49,10 @@ class User(Base):
     balance: Mapped[int] = mapped_column(Integer, server_default="0", nullable=False)
     # IANA, напр. 'Europe/Saratov'.
     timezone: Mapped[str] = mapped_column(Text, server_default="UTC", nullable=False)
+    # Штраф нового квеста по умолчанию = награда × множитель.
+    penalty_multiplier: Mapped[Decimal] = mapped_column(
+        Numeric(4, 2), server_default="1", nullable=False
+    )
     created_at: Mapped[datetime] = created_at_column()
 
 
@@ -56,7 +65,6 @@ class Tier(Base):
     name: Mapped[str] = mapped_column(String(64), nullable=False)
     level: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     default_reward: Mapped[int] = mapped_column(Integer, nullable=False)
-    default_penalty: Mapped[int] = mapped_column(Integer, nullable=False)
     color: Mapped[str | None] = mapped_column(String(16))
     is_archived: Mapped[bool] = mapped_column(Boolean, server_default="false", nullable=False)
 

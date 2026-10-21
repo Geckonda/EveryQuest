@@ -8,6 +8,7 @@
 """
 
 from datetime import UTC, datetime
+from decimal import ROUND_HALF_UP, Decimal
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -23,8 +24,20 @@ class InsufficientFunds(Exception):  # noqa: N818 — доменная ошиб�
         self.balance = balance
 
 
+MAX_COINS = 1_000_000
+
+
 def utcnow() -> datetime:
     return datetime.now(UTC)
+
+
+def default_penalty(reward: int, multiplier: Decimal) -> int:
+    """Штраф по умолчанию: награда × множитель, половина округляется вверх.
+
+    Ограничен сверху, как и любая сумма в API: иначе квест нельзя было бы потом сохранить.
+    """
+    penalty = (reward * multiplier).quantize(Decimal(1), rounding=ROUND_HALF_UP)
+    return min(int(penalty), MAX_COINS)
 
 
 def lock_user(db: Session, user_id: int) -> User:

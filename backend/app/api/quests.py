@@ -7,7 +7,7 @@ from sqlalchemy import select
 from app.crud import apply_changes, check_quest_refs, get_owned
 from app.db import DbSession
 from app.deps import CurrentUser
-from app.economy import lock_user, record_transaction, utcnow
+from app.economy import default_penalty, lock_user, record_transaction, utcnow
 from app.models import Quest
 from app.schemas import QuestCompleted, QuestCreate, QuestOut, QuestStatus, QuestUpdate
 
@@ -60,14 +60,19 @@ def list_quests(
 def create_quest(data: QuestCreate, user: CurrentUser, db: DbSession) -> QuestOut:
     tier = check_quest_refs(db, user, data.tier_id, data.category_id)
     _check_due_at(data.due_at)
+    reward = tier.default_reward if data.reward is None else data.reward
     quest = Quest(
         user_id=user.id,
         tier_id=tier.id,
         category_id=data.category_id,
         name=data.name,
         description=data.description,
-        reward=tier.default_reward if data.reward is None else data.reward,
-        penalty=tier.default_penalty if data.penalty is None else data.penalty,
+        reward=reward,
+        penalty=(
+            default_penalty(reward, user.penalty_multiplier)
+            if data.penalty is None
+            else data.penalty
+        ),
         due_at=data.due_at,
         status="active",
     )
@@ -90,9 +95,11 @@ def update_quest(quest_id: int, data: QuestUpdate, user: CurrentUser, db: DbSess
             changes.get("category_id", quest.category_id),
         )
         if tier.id != quest.tier_id:
-            # Сменили тир и не задали награду явно — берём значения нового тира.
+            # Сменили тир и не задали награду явно — берём награду нового тира и штраф от неё.
             changes.setdefault("reward", tier.default_reward)
-            changes.setdefault("penalty", tier.default_penalty)
+            changes.setdefault(
+                "penalty", default_penalty(changes["reward"], user.penalty_multiplier)
+            )
     if "due_at" in changes:
         _check_due_at(changes["due_at"])
 

@@ -5,12 +5,12 @@ from sqlalchemy.orm import Session
 from app.models import Category, Tier
 
 DEFAULT_TIERS = [
-    # (name, level, reward, penalty, color)
-    ("I", 1, 10, 5, "#8c959f"),
-    ("II", 2, 25, 10, "#2da44e"),
-    ("III", 3, 50, 25, "#0969da"),
-    ("IV", 4, 100, 50, "#8250df"),
-    ("V", 5, 200, 100, "#cf222e"),
+    # (name, level, reward, color); штраф — награда × users.penalty_multiplier
+    ("I", 1, 10, "#8c959f"),
+    ("II", 2, 25, "#2da44e"),
+    ("III", 3, 50, "#0969da"),
+    ("IV", 4, 100, "#8250df"),
+    ("V", 5, 200, "#cf222e"),
 ]
 
 DEFAULT_CATEGORIES = [
@@ -26,15 +26,8 @@ DEFAULT_CATEGORIES = [
 
 def copy_defaults(db: Session, user_id: int) -> None:
     db.add_all(
-        Tier(
-            user_id=user_id,
-            name=name,
-            level=level,
-            default_reward=reward,
-            default_penalty=penalty,
-            color=color,
-        )
-        for name, level, reward, penalty, color in DEFAULT_TIERS
+        Tier(user_id=user_id, name=name, level=level, default_reward=reward, color=color)
+        for name, level, reward, color in DEFAULT_TIERS
     )
     db.add_all(
         Category(user_id=user_id, name=name, description=description, color=color)

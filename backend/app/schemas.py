@@ -1,4 +1,5 @@
 from datetime import date, datetime, time
+from decimal import Decimal
 from typing import Annotated, Any, ClassVar, Literal, Self
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -27,8 +28,9 @@ ShortName = Annotated[str, Field(min_length=1, max_length=64)]
 LongName = Annotated[str, Field(min_length=1, max_length=200)]
 Description = Annotated[str, Field(max_length=2000)]
 HexColor = Annotated[str, Field(pattern=r"^#[0-9a-fA-F]{6}$")]
-Coins = Annotated[int, Field(ge=0, le=1_000_000)]
+Coins = Annotated[int, Field(ge=0, le=1_000_000)]  # верхняя граница = economy.MAX_COINS
 TierLevel = Annotated[int, Field(ge=1, le=5)]
+PenaltyMultiplier = Annotated[Decimal, Field(ge=0, le=10, decimal_places=2)]
 # До недели — с запасом для таймера трат.
 DurationMinutes = Annotated[int, Field(ge=1, le=7 * 24 * 60)]
 
@@ -93,12 +95,15 @@ class UserOut(ORMModel):
     username: str
     balance: int
     timezone: str
+    # Число, а не Decimal: иначе в JSON уйдёт строкой «1.00».
+    penalty_multiplier: float
     created_at: datetime
 
 
 class UserUpdate(PatchModel):
     username: Username | None = None
     timezone: TimeZoneName | None = None
+    penalty_multiplier: PenaltyMultiplier | None = None
 
 
 # --- тиры ---
@@ -109,7 +114,6 @@ class TierOut(ORMModel):
     name: str
     level: int
     default_reward: int
-    default_penalty: int
     color: str | None
     is_archived: bool
 
@@ -118,7 +122,6 @@ class TierCreate(BaseModel):
     name: ShortName
     level: TierLevel
     default_reward: Coins
-    default_penalty: Coins
     color: HexColor | None = None
 
 
@@ -128,7 +131,6 @@ class TierUpdate(PatchModel):
     name: ShortName | None = None
     level: TierLevel | None = None
     default_reward: Coins | None = None
-    default_penalty: Coins | None = None
     color: HexColor | None = None
     is_archived: bool | None = None
 
@@ -216,7 +218,7 @@ class QuestCreate(BaseModel):
     description: Description | None = None
     tier_id: int
     category_id: int | None = None
-    # Не переданы — копируются из тира.
+    # Не переданы: награда — из тира, штраф — награда × множитель пользователя.
     reward: Coins | None = None
     penalty: Coins | None = None
     due_at: AwareDatetime | None = None

@@ -1,4 +1,5 @@
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
@@ -6,11 +7,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.defaults import DEFAULT_TIERS
+from app.economy import default_penalty
 from app.models import Quest, Transaction
 from tests.conftest import auth_headers, register
 
 API = "/api/v1"
-TIER_I_REWARD, TIER_I_PENALTY = DEFAULT_TIERS[0][2], DEFAULT_TIERS[0][3]
+TIER_I_REWARD = DEFAULT_TIERS[0][2]
 
 
 def future(hours: int = 24) -> str:
@@ -52,8 +54,40 @@ def test_create_copies_reward_from_tier(
         client, headers, tier_id=tiers[0]["id"], category_id=category_id, due_at=future()
     )
     assert quest["status"] == "active"
-    assert (quest["reward"], quest["penalty"]) == (TIER_I_REWARD, TIER_I_PENALTY)
+    # Множитель штрафа по умолчанию 1 — штраф равен награде.
+    assert (quest["reward"], quest["penalty"]) == (TIER_I_REWARD, TIER_I_REWARD)
     assert quest["category_id"] == category_id
+
+
+@pytest.mark.parametrize(
+    ("reward", "multiplier", "penalty"),
+    [
+        (10, "1", 10),
+        (10, "2", 20),
+        (25, "1.5", 38),  # 37.5 — половина вверх
+        (10, "0", 0),
+        (1, "0.25", 0),
+        (2, "0.25", 1),  # 0.5 — половина вверх
+        (1_000_000, "10", 1_000_000),  # не больше предела суммы
+    ],
+)
+def test_default_penalty(reward: int, multiplier: str, penalty: int) -> None:
+    assert default_penalty(reward, Decimal(multiplier)) == penalty
+
+
+def test_create_uses_penalty_multiplier(
+    client: TestClient, headers: dict[str, str], tiers: list[dict]
+) -> None:
+    client.patch(f"{API}/me", headers=headers, json={"penalty_multiplier": 2})
+
+    from_tier = create_quest(client, headers, tier_id=tiers[0]["id"])
+    assert from_tier["penalty"] == TIER_I_REWARD * 2
+
+    own_reward = create_quest(client, headers, tier_id=tiers[0]["id"], reward=7)
+    assert own_reward["penalty"] == 14
+
+    explicit = create_quest(client, headers, tier_id=tiers[0]["id"], reward=7, penalty=3)
+    assert explicit["penalty"] == 3
 
 
 def test_create_with_explicit_reward(
@@ -172,7 +206,7 @@ def test_update_quest(client: TestClient, headers: dict[str, str], tiers: list[d
         json={"tier_id": tiers[3]["id"], "reward": 1},
     )
     assert explicit.json()["reward"] == 1
-    assert explicit.json()["penalty"] == DEFAULT_TIERS[3][3]
+    assert explicit.json()["penalty"] == 1  # от заданной награды, а не от награды тира
 
 
 def test_archive_quest(client: TestClient, headers: dict[str, str], tiers: list[dict]) -> None:

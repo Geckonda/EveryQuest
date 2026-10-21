@@ -41,12 +41,13 @@ users
   id PK, email UNIQUE, username, password_hash,
   balance INT DEFAULT 0,          -- может быть отрицательным
   timezone TEXT,                  -- IANA, напр. 'Europe/Saratov'
+  penalty_multiplier NUMERIC(4,2) DEFAULT 1,  -- штраф по умолчанию = награда × множитель
   created_at
 
 tiers
   id PK, user_id FK, name,        -- 'I'..'V'
   level INT,                      -- 1–5, для сортировки
-  default_reward INT, default_penalty INT,
+  default_reward INT,             -- штрафа у тира нет, см. users.penalty_multiplier
   color, is_archived
 
 categories

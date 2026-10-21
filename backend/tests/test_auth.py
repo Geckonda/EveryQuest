@@ -103,6 +103,19 @@ def test_update_me(client: TestClient) -> None:
     assert bad.status_code == 422
 
 
+def test_penalty_multiplier(client: TestClient) -> None:
+    headers = auth_headers(register(client))
+    assert client.get("/api/v1/me", headers=headers).json()["penalty_multiplier"] == 1
+
+    response = client.patch("/api/v1/me", headers=headers, json={"penalty_multiplier": 1.5})
+    assert response.status_code == 200
+    assert response.json()["penalty_multiplier"] == 1.5  # число, а не строка «1.50»
+
+    for bad in (-1, 10.01, 1.234, None):
+        rejected = client.patch("/api/v1/me", headers=headers, json={"penalty_multiplier": bad})
+        assert rejected.status_code == 422, bad
+
+
 def test_users_see_only_their_own_data(client: TestClient) -> None:
     first = auth_headers(register(client, email="first@example.com"))
     second = auth_headers(register(client, email="second@example.com"))

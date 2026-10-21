@@ -4,7 +4,7 @@ from sqlalchemy import select
 from app.crud import apply_changes, check_quest_refs, get_owned
 from app.db import DbSession
 from app.deps import CurrentUser
-from app.economy import utcnow
+from app.economy import default_penalty, utcnow
 from app.jobs import generate_instance
 from app.models import RecurringQuest, User
 from app.recurrence import local_today, next_due_at
@@ -49,12 +49,17 @@ def create_recurring(
             status.HTTP_422_UNPROCESSABLE_ENTITY, "Дата окончания раньше даты начала"
         )
 
+    reward = tier.default_reward if data.reward is None else data.reward
     template = RecurringQuest(
         user_id=user.id,
         **data.model_dump(exclude={"start_date", "reward", "penalty"}),
         start_date=start_date,
-        reward=tier.default_reward if data.reward is None else data.reward,
-        penalty=tier.default_penalty if data.penalty is None else data.penalty,
+        reward=reward,
+        penalty=(
+            default_penalty(reward, user.penalty_multiplier)
+            if data.penalty is None
+            else data.penalty
+        ),
         is_active=True,
     )
     db.add(template)
@@ -82,7 +87,9 @@ def update_recurring(
         )
         if tier.id != template.tier_id:
             changes.setdefault("reward", tier.default_reward)
-            changes.setdefault("penalty", tier.default_penalty)
+            changes.setdefault(
+                "penalty", default_penalty(changes["reward"], user.penalty_multiplier)
+            )
 
     # Расписание проверяется целиком: например, смена weekly → daily с прежними днями недели.
     merged = {

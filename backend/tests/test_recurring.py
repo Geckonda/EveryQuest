@@ -56,6 +56,17 @@ def instances(db: Session, template_id: int) -> list[Quest]:
 # --- создание ---
 
 
+def test_penalty_from_multiplier(
+    client: TestClient, db: Session, headers: dict[str, str], tier_id: int
+) -> None:
+    client.patch(f"{API}/me", headers=headers, json={"penalty_multiplier": 0.5})
+    template = create(client, headers, tier_id, reward=15)
+
+    assert template["penalty"] == 8  # 7.5 — половина вверх
+    [quest] = instances(db, template["id"])
+    assert quest.penalty == 8
+
+
 def test_daily_creates_instance_for_today(
     client: TestClient, db: Session, headers: dict[str, str], tier_id: int
 ) -> None:
@@ -63,7 +74,7 @@ def test_daily_creates_instance_for_today(
 
     assert template["start_date"] == "2026-10-21"
     assert template["due_time"] == "23:59:00"
-    assert (template["reward"], template["penalty"]) == DEFAULT_TIERS[0][2:4]
+    assert (template["reward"], template["penalty"]) == (DEFAULT_TIERS[0][2],) * 2
     assert template["next_due_at"] == "2026-10-21T23:59:00Z"
 
     [quest] = instances(db, template["id"])
@@ -300,7 +311,7 @@ def test_missed_instance_penalized_and_next_created(
     assert (yesterday.status, yesterday.penalty_applied) == ("failed", True)
     assert (today.status, today.period_date) == ("active", date(2026, 10, 22))
     user_id = client.get(f"{API}/me", headers=headers).json()["id"]
-    assert db.get(User, user_id).balance == -DEFAULT_TIERS[0][3]
+    assert db.get(User, user_id).balance == -DEFAULT_TIERS[0][2]
 
 
 def test_no_backfill_after_downtime(
