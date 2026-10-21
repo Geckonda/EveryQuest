@@ -78,7 +78,7 @@ quests                            -- конкретный квест (разов
 
 rewards                           -- «траты»
   id PK, user_id FK, name, description, price INT,
-  duration_minutes INT NULL,      -- задел под таймер
+  duration_minutes INT NULL,      -- есть — при покупке стартует сеанс
   is_archived, created_at
 
 transactions
@@ -87,6 +87,12 @@ transactions
   type,                           -- quest_reward | penalty | purchase | manual
   quest_id FK NULL, reward_id FK NULL,
   balance_after INT, created_at
+
+reward_sessions                   -- идущая трата: «ТикТок на 20 минут»
+  id PK, user_id FK, reward_id FK, transaction_id FK UNIQUE,
+  name,                           -- название на момент заказа
+  started_at, ends_at,
+  finished_at NULL                -- закончили раньше срока
 ```
 
 Решения по схеме:
@@ -168,7 +174,9 @@ REST под префиксом `/api/v1`. Все ресурсы, кроме auth
 | PATCH | `/recurring-quests/{id}` | Изменение, пауза, архивация |
 | GET / POST | `/rewards` | Траты: список, создание |
 | PATCH | `/rewards/{id}` | Изменение, архивация |
-| POST | `/rewards/{id}/purchase` | Купить (400, если монет не хватает) |
+| POST | `/rewards/{id}/purchase` | Купить (400, если монет не хватает); у траты с длительностью — стартует сеанс |
+| GET | `/reward-sessions/active` | Идущие траты |
+| POST | `/reward-sessions/{id}/finish` | Закончить трату раньше срока |
 | GET | `/transactions` | История с пагинацией |
 | POST | `/transactions/manual` | Ручная корректировка баланса |
 
@@ -248,7 +256,7 @@ REST под префиксом `/api/v1`. Все ресурсы, кроме auth
 
 | Функция | Что уже есть | Что добавить |
 | --- | --- | --- |
-| Таймер трат | `rewards.duration_minutes` | Таблица активных сессий, экран таймера |
+| ~~Таймер трат~~ | Сделано: `reward_sessions`, плашка в шапке | Push-уведомление об окончании (с PWA) |
 | Уведомления | `due_at`, `timezone`, PWA | Таблица push-подписок, pywebpush, задача напоминаний |
 | Статистика | `transactions` | Графики заработка и трат по дням |
 | Отмена выполнения | Журнал транзакций | Обратная транзакция, `status = active` |

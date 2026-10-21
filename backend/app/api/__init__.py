@@ -7,6 +7,7 @@ from app.api import (
     me,
     quests,
     recurring,
+    reward_sessions,
     rewards,
     tiers,
     transactions,
@@ -19,6 +20,7 @@ api_router.include_router(me.router)
 api_router.include_router(tiers.router)
 api_router.include_router(categories.router)
 api_router.include_router(rewards.router)
+api_router.include_router(reward_sessions.router)
 api_router.include_router(quests.router)
 api_router.include_router(recurring.router)
 api_router.include_router(transactions.router)

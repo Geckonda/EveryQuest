@@ -7,7 +7,7 @@ from app.db import DbSession
 from app.deps import CurrentUser
 from app.economy import InsufficientFunds, purchase
 from app.models import Reward
-from app.schemas import BalanceChange, RewardCreate, RewardOut, RewardUpdate
+from app.schemas import PurchaseOut, RewardCreate, RewardOut, RewardSessionOut, RewardUpdate
 
 router = APIRouter(prefix="/rewards", tags=["rewards"])
 
@@ -42,13 +42,17 @@ def update_reward(
 
 
 @router.post("/{reward_id}/purchase", responses={400: {"description": "Не хватает монет"}})
-def purchase_reward(reward_id: int, user: CurrentUser, db: DbSession) -> BalanceChange:
+def purchase_reward(reward_id: int, user: CurrentUser, db: DbSession) -> PurchaseOut:
     reward = get_owned(db, Reward, reward_id, user)
     if reward.is_archived:
         raise HTTPException(status.HTTP_409_CONFLICT, "Трата в архиве")
     try:
-        transaction, locked_user = purchase(db, user.id, reward)
+        transaction, locked_user, session = purchase(db, user.id, reward)
     except InsufficientFunds as error:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(error)) from None
     db.commit()
-    return BalanceChange(transaction=transaction_out(db, transaction), balance=locked_user.balance)
+    return PurchaseOut(
+        transaction=transaction_out(db, transaction),
+        balance=locked_user.balance,
+        session=session and RewardSessionOut.model_validate(session),
+    )

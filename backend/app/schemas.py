@@ -368,6 +368,23 @@ class BalanceChange(BaseModel):
     balance: int
 
 
+# --- идущие траты ---
+
+
+class RewardSessionOut(ORMModel):
+    id: int
+    reward_id: int
+    name: str
+    started_at: datetime
+    ends_at: datetime
+    finished_at: datetime | None
+
+
+class PurchaseOut(BalanceChange):
+    # Есть, если у траты задана длительность.
+    session: RewardSessionOut | None = None
+
+
 class ManualTransactionIn(BaseModel):
     amount: Annotated[int, Field(ge=-1_000_000, le=1_000_000)]
     note: Description | None = None

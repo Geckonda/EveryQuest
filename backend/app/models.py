@@ -169,6 +169,30 @@ class Reward(Base):
     created_at: Mapped[datetime] = created_at_column()
 
 
+class RewardSession(Base):
+    """Идущая трата с длительностью: «ТикТок на 20 минут» — с момента заказа."""
+
+    __tablename__ = "reward_sessions"
+    __table_args__ = (
+        CheckConstraint("ends_at > started_at", name="ends_after_start"),
+        Index("ix_reward_sessions_user_id_ends_at", "user_id", "ends_at"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    reward_id: Mapped[int] = mapped_column(ForeignKey("rewards.id"), nullable=False)
+    # Одна покупка — один сеанс.
+    transaction_id: Mapped[int] = mapped_column(
+        ForeignKey("transactions.id"), unique=True, nullable=False
+    )
+    # Название на момент заказа: трату могут переименовать, пока сеанс идёт.
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    started_at: Mapped[datetime] = mapped_column(TZDateTime, nullable=False)
+    ends_at: Mapped[datetime] = mapped_column(TZDateTime, nullable=False)
+    # Закончили раньше срока; NULL — шёл до ends_at.
+    finished_at: Mapped[datetime | None] = mapped_column(TZDateTime)
+
+
 class Transaction(Base):
     __tablename__ = "transactions"
     __table_args__ = (

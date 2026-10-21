@@ -7,13 +7,13 @@
 Функции не делают commit — это решает вызывающий код.
 """
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Quest, Reward, Transaction, User
+from app.models import Quest, Reward, RewardSession, Transaction, User
 from app.schemas import TransactionType
 
 
@@ -94,13 +94,32 @@ def record_transaction(
     return transaction
 
 
-def purchase(db: Session, user_id: int, reward: Reward) -> tuple[Transaction, User]:
-    """Покупка разрешена, только если хватает монет; в минусе купить ничего нельзя."""
+def purchase(
+    db: Session, user_id: int, reward: Reward
+) -> tuple[Transaction, User, RewardSession | None]:
+    """Покупка разрешена, только если хватает монет; в минусе купить ничего нельзя.
+
+    У траты с длительностью в той же транзакции стартует сеанс — отсчёт с момента заказа.
+    """
     user = lock_user(db, user_id)
     if user.balance < reward.price:
         raise InsufficientFunds(reward.price, user.balance)
     transaction = record_transaction(db, user, -reward.price, "purchase", reward_id=reward.id)
-    return transaction, user
+
+    session = None
+    if reward.duration_minutes:
+        started_at = utcnow()
+        session = RewardSession(
+            user_id=user.id,
+            reward_id=reward.id,
+            transaction_id=transaction.id,
+            name=reward.name,
+            started_at=started_at,
+            ends_at=started_at + timedelta(minutes=reward.duration_minutes),
+        )
+        db.add(session)
+        db.flush()
+    return transaction, user, session
 
 
 def manual_adjust(
