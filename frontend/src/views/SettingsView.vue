@@ -11,6 +11,7 @@ import CoinIcon from '@/components/CoinIcon.vue'
 import TierSeal from '@/components/TierSeal.vue'
 import TierFormModal from '@/components/TierFormModal.vue'
 import CategoryFormModal from '@/components/CategoryFormModal.vue'
+import ProfileSection from '@/components/ProfileSection.vue'
 
 const catalog = useCatalogStore()
 const toggleArchive = useArchiveToggle()
@@ -46,7 +47,7 @@ function openCategory(category: Category | null) {
 
 <template>
   <h1 class="page-title">Настройки</h1>
-  <p class="page-subtitle">Устав гильдии: тиры квестов и их награды, категории дел</p>
+  <p class="page-subtitle">Устав гильдии: тиры квестов и их награды, категории дел, профиль</p>
   <div class="flourish">✦</div>
   <NAlert v-if="loadError" type="error">{{ loadError }}</NAlert>
   <NSpin v-else :show="loading">
@@ -68,7 +69,6 @@ function openCategory(category: Category | null) {
               <TierSeal :tier="tier" />
               <span v-if="tierLabel(tier)" class="tier-name">{{ tierLabel(tier) }}</span>
               <span class="reward num"><CoinIcon :size="14" /> +{{ tier.default_reward }}</span>
-              <span class="penalty num">штраф {{ tier.default_penalty }}</span>
             </div>
           </template>
         </CatalogSection>
@@ -98,6 +98,10 @@ function openCategory(category: Category | null) {
             </div>
           </template>
         </CatalogSection>
+      </NTabPane>
+
+      <NTabPane name="profile" tab="Профиль">
+        <ProfileSection />
       </NTabPane>
     </NTabs>
   </NSpin>
@@ -138,12 +142,6 @@ function openCategory(category: Category | null) {
   gap: 4px;
   color: var(--color-gold);
   font-weight: 700;
-}
-
-.penalty {
-  flex: none;
-  color: var(--color-error);
-  font-size: 0.875rem;
 }
 
 .dot {

@@ -1,7 +1,7 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { API_PREFIX, api } from '@/api/client'
-import type { RegisterPayload, TokenPair, User } from '@/api/types'
+import type { RegisterPayload, TokenPair, User, UserPayload } from '@/api/types'
 
 const ACCESS_KEY = 'eq.accessToken'
 const REFRESH_KEY = 'eq.refreshToken'
@@ -82,6 +82,10 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = await api.get<User>('/me')
   }
 
+  async function updateMe(payload: Partial<UserPayload>) {
+    user.value = await api.patch<User>('/me', payload)
+  }
+
   function logout() {
     setTokens(null)
     user.value = null
@@ -101,6 +105,7 @@ export const useAuthStore = defineStore('auth', () => {
     login,
     register,
     fetchMe,
+    updateMe,
     logout,
     setBalance,
   }

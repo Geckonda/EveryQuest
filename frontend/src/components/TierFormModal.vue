@@ -22,13 +22,12 @@ const show = defineModel<boolean>('show', { required: true })
 const catalog = useCatalogStore()
 const message = useMessage()
 
-type NumberField = 'level' | 'default_reward' | 'default_penalty'
+type NumberField = 'level' | 'default_reward'
 // Числа null — поле очищено в форме; сохранять такое нельзя.
 const form = reactive<Omit<TierPayload, NumberField> & Record<NumberField, number | null>>({
   name: '',
   level: 1,
   default_reward: 10,
-  default_penalty: 5,
   color: DEFAULT_COLOR,
 })
 const error = ref<string | null>(null)
@@ -42,22 +41,17 @@ watch(show, (opened) => {
     name: t?.name ?? '',
     level: t?.level ?? 1,
     default_reward: t?.default_reward ?? 10,
-    default_penalty: t?.default_penalty ?? 5,
     color: t?.color ?? DEFAULT_COLOR,
   })
 })
 
 const isComplete = computed(
-  () =>
-    form.name.trim() !== '' &&
-    form.level !== null &&
-    form.default_reward !== null &&
-    form.default_penalty !== null,
+  () => form.name.trim() !== '' && form.level !== null && form.default_reward !== null,
 )
 
 async function save() {
-  const { level, default_reward, default_penalty } = form
-  if (level === null || default_reward === null || default_penalty === null) return
+  const { level, default_reward } = form
+  if (level === null || default_reward === null) return
   error.value = null
   saving.value = true
   try {
@@ -65,7 +59,6 @@ async function save() {
       name: form.name.trim(),
       level,
       default_reward,
-      default_penalty,
       color: form.color,
     })
     message.success(props.tier ? 'Тир сохранён' : 'Тир создан')
@@ -92,14 +85,9 @@ async function save() {
       <NFormItem label="Уровень (1–5, для сортировки)">
         <NInputNumber v-model:value="form.level" :min="1" :max="5" :precision="0" />
       </NFormItem>
-      <div class="row">
-        <NFormItem label="Награда">
-          <NInputNumber v-model:value="form.default_reward" :min="0" :precision="0" />
-        </NFormItem>
-        <NFormItem label="Штраф">
-          <NInputNumber v-model:value="form.default_penalty" :min="0" :precision="0" />
-        </NFormItem>
-      </div>
+      <NFormItem label="Награда" feedback="Штраф = награда × множитель из профиля">
+        <NInputNumber v-model:value="form.default_reward" :min="0" :precision="0" />
+      </NFormItem>
       <NFormItem label="Цвет">
         <NColorPicker
           v-model:value="form.color"
@@ -109,7 +97,7 @@ async function save() {
         />
       </NFormItem>
       <p v-if="tier" class="hint">
-        Новые награда и штраф применятся к новым квестам. Уже созданные не изменятся.
+        Новая награда применится к новым квестам. Уже созданные не изменятся.
       </p>
       <NAlert v-if="error" type="error" class="error">{{ error }}</NAlert>
       <NButton type="primary" attr-type="submit" block :loading="saving" :disabled="!isComplete">

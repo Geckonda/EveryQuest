@@ -16,6 +16,8 @@ import type { Quest } from '@/api/types'
 import { errorMessage } from '@/api/errors'
 import { useCatalogStore } from '@/stores/catalog'
 import { useQuestsStore } from '@/stores/quests'
+import { useRewardFields } from '@/composables/useRewardFields'
+import PenaltyHint from './PenaltyHint.vue'
 
 const props = defineProps<{ quest: Quest | null }>()
 const show = defineModel<boolean>('show', { required: true })
@@ -37,11 +39,10 @@ const form = reactive({
 const error = ref<string | null>(null)
 const saving = ref(false)
 
+const { reset, setPenalty, resetPenalty, penaltyTouched } = useRewardFields(form)
+
 const tierOptions = computed(() =>
-  catalog.activeTiers.map((t) => ({
-    label: `${t.name} (+${t.default_reward} / −${t.default_penalty})`,
-    value: t.id,
-  })),
+  catalog.activeTiers.map((t) => ({ label: `${t.name} (+${t.default_reward})`, value: t.id })),
 )
 const categoryOptions = computed(() =>
   catalog.activeCategories.map((c) => ({ label: c.name, value: c.id })),
@@ -64,40 +65,21 @@ function isPastDay(ts: number): boolean {
   return ts < new Date().setHours(0, 0, 0, 0)
 }
 
-let filling = false
-
 watch(show, (opened) => {
   if (!opened) return
   error.value = null
   const q = props.quest
-  filling = true
+  const tier = catalog.activeTiers[0]
   Object.assign(form, {
     name: q?.name ?? '',
     description: q?.description ?? null,
-    tierId: q?.tier_id ?? catalog.activeTiers[0]?.id ?? null,
     categoryId: q?.category_id ?? null,
-    reward: q?.reward ?? catalog.activeTiers[0]?.default_reward ?? null,
-    penalty: q?.penalty ?? catalog.activeTiers[0]?.default_penalty ?? null,
     // Новый квест — по умолчанию до конца дня; у существующего срок как есть.
     due: q ? (q.due_at ? new Date(q.due_at).getTime() : null) : endOfDay(0),
   })
-  filling = false
+  if (q) reset(q.tier_id, q.reward, q.penalty)
+  else reset(tier?.id ?? null, tier?.default_reward ?? null, null)
 })
-
-// Сменили тир — подставляем его награду и штраф (их можно поправить вручную).
-watch(
-  () => form.tierId,
-  (tierId) => {
-    if (filling) return
-    const tier = catalog.tiers.find((t) => t.id === tierId)
-    if (tier) {
-      form.reward = tier.default_reward
-      form.penalty = tier.default_penalty
-    }
-  },
-  // sync: иначе сработает уже после заполнения формы и затрёт награду редактируемого квеста.
-  { flush: 'sync' },
-)
 
 const isComplete = computed(
   () =>
@@ -175,7 +157,10 @@ async function save() {
           <NInputNumber v-model:value="form.reward" :min="0" :precision="0" />
         </NFormItem>
         <NFormItem label="Штраф">
-          <NInputNumber v-model:value="form.penalty" :min="0" :precision="0" />
+          <NInputNumber :value="form.penalty" :min="0" :precision="0" @update:value="setPenalty" />
+          <template #feedback>
+            <PenaltyHint :touched="penaltyTouched" @reset="resetPenalty" />
+          </template>
         </NFormItem>
       </div>
       <NFormItem label="Срок">

@@ -21,6 +21,8 @@ import type { Frequency, RecurringPayload, RecurringQuest } from '@/api/types'
 import { errorMessage } from '@/api/errors'
 import { useCatalogStore } from '@/stores/catalog'
 import { useRecurringStore } from '@/stores/recurring'
+import { useRewardFields } from '@/composables/useRewardFields'
+import PenaltyHint from './PenaltyHint.vue'
 import { plural } from '@/utils/format'
 import { WEEKDAYS, describeSchedule } from '@/utils/schedule'
 
@@ -56,11 +58,10 @@ const form = reactive({
 const error = ref<string | null>(null)
 const saving = ref(false)
 
+const { reset, setPenalty, resetPenalty, penaltyTouched } = useRewardFields(form)
+
 const tierOptions = computed(() =>
-  catalog.activeTiers.map((t) => ({
-    label: `${t.name} (+${t.default_reward} / −${t.default_penalty})`,
-    value: t.id,
-  })),
+  catalog.activeTiers.map((t) => ({ label: `${t.name} (+${t.default_reward})`, value: t.id })),
 )
 const categoryOptions = computed(() =>
   catalog.activeCategories.map((c) => ({ label: c.name, value: c.id })),
@@ -77,21 +78,15 @@ const intervalUnit = computed(() => {
   return plural(n, 'месяц', 'месяца', 'месяцев')
 })
 
-let filling = false
-
 watch(show, (opened) => {
   if (!opened) return
   error.value = null
   const t = props.template
   const tier = catalog.activeTiers[0]
-  filling = true
   Object.assign(form, {
     name: t?.name ?? '',
     description: t?.description ?? null,
-    tierId: t?.tier_id ?? tier?.id ?? null,
     categoryId: t?.category_id ?? null,
-    reward: t?.reward ?? tier?.default_reward ?? null,
-    penalty: t?.penalty ?? tier?.default_penalty ?? null,
     frequency: t?.frequency ?? 'daily',
     interval: t?.interval ?? 1,
     daysOfWeek: t?.days_of_week ?? [],
@@ -100,22 +95,9 @@ watch(show, (opened) => {
     startDate: t?.start_date ?? todayIso(),
     endDate: t?.end_date ?? null,
   })
-  filling = false
+  if (t) reset(t.tier_id, t.reward, t.penalty)
+  else reset(tier?.id ?? null, tier?.default_reward ?? null, null)
 })
-
-watch(
-  () => form.tierId,
-  (tierId) => {
-    if (filling) return
-    const tier = catalog.tiers.find((t) => t.id === tierId)
-    if (tier) {
-      form.reward = tier.default_reward
-      form.penalty = tier.default_penalty
-    }
-  },
-  // sync: иначе сработает после заполнения формы и затрёт награду редактируемого шаблона.
-  { flush: 'sync' },
-)
 
 const payload = computed((): RecurringPayload | null => {
   const { tierId, reward, penalty, interval, dueTime, startDate } = form
@@ -199,7 +181,10 @@ async function save() {
           <NInputNumber v-model:value="form.reward" :min="0" :precision="0" />
         </NFormItem>
         <NFormItem label="Штраф">
-          <NInputNumber v-model:value="form.penalty" :min="0" :precision="0" />
+          <NInputNumber :value="form.penalty" :min="0" :precision="0" @update:value="setPenalty" />
+          <template #feedback>
+            <PenaltyHint :touched="penaltyTouched" @reset="resetPenalty" />
+          </template>
         </NFormItem>
       </div>
 

@@ -12,7 +12,6 @@ const tier = (id: number, level: number, extra: Partial<Tier> = {}): Tier => ({
   name: `T${id}`,
   level,
   default_reward: 10,
-  default_penalty: 5,
   color: null,
   is_archived: false,
   ...extra,

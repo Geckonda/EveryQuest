@@ -124,7 +124,6 @@ const visible = computed(() =>
   .actions {
     flex: 1 1 100%;
     justify-content: flex-start;
-    margin-left: -12px; /* выравнивает текст quaternary-кнопок по краю содержимого */
   }
 
   .toolbar {

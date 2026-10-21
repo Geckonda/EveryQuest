@@ -10,8 +10,12 @@ export interface User {
   username: string
   balance: number
   timezone: string
+  /** Штраф нового квеста по умолчанию = награда × множитель. */
+  penalty_multiplier: number
   created_at: string
 }
+
+export type UserPayload = Pick<User, 'username' | 'timezone' | 'penalty_multiplier'>
 
 export interface RegisterPayload {
   email: string
@@ -25,7 +29,6 @@ export interface Tier {
   name: string
   level: number
   default_reward: number
-  default_penalty: number
   color: string | null
   is_archived: boolean
 }
