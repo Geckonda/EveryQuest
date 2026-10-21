@@ -40,6 +40,19 @@ docker --version && docker compose version
 curl -fsSL https://get.docker.com | sh
 ```
 
+**Docker есть, а `docker compose version` отвечает `unknown command`.** Так бывает с Docker из
+пакетов Ubuntu 20.04 (`docker.io`): в нём нет плагина Compose v2, а старый `docker-compose` (через
+дефис) наш файл не понимает. Поставить плагин (для `uname -m` = `x86_64`; для `aarch64` —
+`docker-compose-linux-aarch64`):
+
+```sh
+mkdir -p /usr/local/lib/docker/cli-plugins
+curl -fSL https://github.com/docker/compose/releases/download/v2.29.7/docker-compose-linux-x86_64 \
+  -o /usr/local/lib/docker/cli-plugins/docker-compose
+chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+docker compose version
+```
+
 ## 2. Освободить порты 80 и 443
 
 Посмотреть, что запущено:
