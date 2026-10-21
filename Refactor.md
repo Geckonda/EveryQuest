@@ -267,6 +267,7 @@
 - `.env.prod.example`: пароль базы — `openssl rand -hex 32` (он в URL подключения, а `+ / =` из base64 его ломают), секрет — base64; `DEPLOY.md` заполняет их одной командой `sed`.
 - `.gitattributes`: `*.sh` и `Caddyfile` — LF; скрипты помечены исполняемыми в индексе git (`update-index --chmod=+x`) — на Windows бит иначе не сохраняется.
 - Проверено локально на прод-стеке с `DOMAIN=localhost` (внутренний сертификат Caddy): все сервисы healthy, http → 308 на https, заголовки кэша, сжатие; в браузере — регистрация, тур, Secure-cookie переживает перезагрузку, сдача квеста; IP в попытках входа — клиента, а не контейнера Caddy; свежий дамп, `restore.sh --check` и `--replace` (квест, добавленный после дампа, пропал, API поднялся). Dev-окружение после смены Dockerfile пересобрано, 209 тестов.
+- Деплой на VPS (Ubuntu 20.04, 1,9 ГБ, рядом работает игровой сервер scarytales на UDP 7777 — не тронут): PlotCreator снят с дампом (`/root/plotcreator_2026-10-21.sql`), системный nginx (держал 80/443 для `plotcreator.dotnetdon.ru`) отключён, добавлен swap 2 ГБ. Приложение работает на **https://94-232-42-149.sslip.io** с сертификатом Let's Encrypt. Свой адрес `quest.dotnetdon.ru` — когда владелец домена добавит A-запись в Cloudflare (DNS only), переключение одной командой (`DEPLOY.md`, «Смена домена»).
 
 ---
 
@@ -300,6 +301,10 @@
 | Защита входа | Время попыток писала база (`server_default now()`), а лимит сравнивал с подменённым в тестах `utcnow` — окно «не проходило» | `record()` ставит `created_at=utcnow()` явно |
 | Деплой | Caddy не стартовал: пустой `ACME_EMAIL` превращался в директиву `email` без аргумента | Убрал — почта для Let's Encrypt необязательна |
 | Деплой | `Cache-Control: no-cache` не ставился на `/quests`: матчер `header` проверяет исходный путь — до подмены на `/index.html` в `try_files` | Матчер «всё, кроме `/assets/*`» |
+| Деплой | В Docker из пакетов Ubuntu 20.04 нет плагина `docker compose` (v2), а `docker-compose` v1 не понимает наш файл | Плагин скачан в `/usr/local/lib/docker/cli-plugins` (`DEPLOY.md`) |
+| Деплой | На сервере не было `git`; команды после упавшего `git clone` выполнились впустую (`sed` по чужой папке — к счастью, `.env` там не нашлось) | `apt install git`; в инструкции цепочки через `&&` |
+| Деплой | `TLS handshake timeout` к `registry-1.docker.io` — Docker Hub из России недоступен | Зеркала `mirror.gcr.io` и `dockerhub.timeweb.cloud` в `/etc/docker/daemon.json`, `systemctl reload docker` (не `restart` — не трогает запущенные контейнеры) |
+| Деплой | `worker` без `build` с образом `everyquest-backend` — compose мог пытаться скачать его из реестра | У `worker` тот же `build`, что у `backend` |
 | Коммиты | В PowerShell 5.1 `git add "Ежеквестик — план MVP.md"` не находит файл: кириллица и «—» искажаются при передаче аргументов в git | Добавлять по маске без кириллицы: `git add -- '*MVP.md'`. Возможно, переименовать план в латиницу |
 
 ---
