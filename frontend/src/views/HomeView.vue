@@ -1,15 +1,18 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { NAlert, NButton, NEmpty, NSpin, NTabPane, NTabs, useDialog, useMessage } from 'naive-ui'
 import type { Quest } from '@/api/types'
 import { errorMessage } from '@/api/errors'
 import { coins } from '@/utils/format'
+import { filterQuests } from '@/utils/questFilters'
+import { useQuestFilters } from '@/composables/useQuestFilters'
 import { useCatalogStore } from '@/stores/catalog'
 import { useQuestsStore } from '@/stores/quests'
 import { useRecurringStore } from '@/stores/recurring'
 import QuestCard from '@/components/QuestCard.vue'
 import RecurringList from '@/components/RecurringList.vue'
 import QuestFormModal from '@/components/QuestFormModal.vue'
+import QuestFilters from '@/components/QuestFilters.vue'
 
 const catalog = useCatalogStore()
 const quests = useQuestsStore()
@@ -132,6 +135,27 @@ function archive(quest: Quest) {
 
 const tierOf = (quest: Quest) => catalog.tiers.find((t) => t.id === quest.tier_id)
 const categoryOf = (quest: Quest) => catalog.categories.find((c) => c.id === quest.category_id)
+
+const { filters, reset: resetFilters } = useQuestFilters()
+const visibleActive = computed(() =>
+  filterQuests(quests.active, filters, {
+    now: now.value,
+    tierLevel: (tierId) => catalog.tiers.find((t) => t.id === tierId)?.level ?? 0,
+  }),
+)
+
+const loadingMore = ref(false)
+
+async function loadMoreHistory() {
+  loadingMore.value = true
+  try {
+    await quests.loadHistory(true)
+  } catch (e) {
+    message.error(errorMessage(e))
+  } finally {
+    loadingMore.value = false
+  }
+}
 </script>
 
 <template>
@@ -155,8 +179,21 @@ const categoryOf = (quest: Quest) => catalog.categories.find((c) => c.id === que
           description="Доска пуста. Повесьте первый квест — и зарабатывайте золото на отдых"
           class="empty"
         />
+        <template v-else>
+          <QuestFilters
+            v-model:filters="filters"
+            :shown="visibleActive.length"
+            :total="quests.active.length"
+            @reset="resetFilters"
+          />
+          <NEmpty
+            v-if="!visibleActive.length"
+            description="Под фильтры ни один квест не подходит"
+            class="empty"
+          />
+        </template>
         <QuestCard
-          v-for="quest in quests.active"
+          v-for="quest in visibleActive"
           :key="quest.id"
           :quest="quest"
           :tier="tierOf(quest)"
@@ -184,6 +221,9 @@ const categoryOf = (quest: Quest) => catalog.categories.find((c) => c.id === que
             :category="categoryOf(quest)"
             :now="now"
           />
+          <div v-if="quests.historyHasMore" class="more">
+            <NButton :loading="loadingMore" @click="loadMoreHistory">Показать ещё</NButton>
+          </div>
         </NSpin>
       </NTabPane>
       <NTabPane name="recurring" tab="Повторяющиеся">
@@ -208,5 +248,11 @@ const categoryOf = (quest: Quest) => catalog.categories.find((c) => c.id === que
 
 .empty {
   padding: 32px 0;
+}
+
+.more {
+  display: flex;
+  justify-content: center;
+  margin-top: 8px;
 }
 </style>

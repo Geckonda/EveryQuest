@@ -13,19 +13,9 @@ const multiplier = computed(() => auth.user?.penalty_multiplier ?? 1)
 <template>
   <span v-if="touched">
     Свой штраф ·
-    <button type="button" class="link" @click="$emit('reset')">награда × {{ multiplier }}</button>
+    <button type="button" class="link-button" @click="$emit('reset')">
+      награда × {{ multiplier }}
+    </button>
   </span>
   <span v-else>Награда × {{ multiplier }}</span>
 </template>
-
-<style scoped>
-.link {
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--color-gold);
-  font: inherit;
-  text-decoration: underline dotted;
-  cursor: pointer;
-}
-</style>

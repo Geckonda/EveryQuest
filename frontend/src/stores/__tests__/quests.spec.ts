@@ -93,6 +93,31 @@ describe('quests store', () => {
     expect(auth.user?.balance).toBe(-5)
   })
 
+  it('архив грузится страницами без повторов', async () => {
+    const closed = (id: number) =>
+      quest(id, null, { status: 'completed', close_reason: 'completed' })
+    const firstPage = Array.from({ length: 50 }, (_, i) => closed(100 - i))
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(json(firstPage))
+      // Пока листали, закрыли ещё квест — offset сдвинулся, квест 51 пришёл повторно.
+      .mockResolvedValueOnce(json([closed(51), closed(50)]))
+    vi.stubGlobal('fetch', fetchMock)
+    const quests = useQuestsStore()
+
+    await quests.loadHistory()
+    expect(quests.historyHasMore).toBe(true)
+    const url = String(fetchMock.mock.calls[0]?.[0])
+    expect(url).toContain('status=completed&status=failed&status=archived')
+    expect(url).toContain('offset=0')
+
+    await quests.loadHistory(true)
+    expect(String(fetchMock.mock.calls[1]?.[0])).toContain('offset=50')
+    expect(quests.history).toHaveLength(51)
+    expect(quests.history[50]?.id).toBe(50)
+    expect(quests.historyHasMore).toBe(false)
+  })
+
   it('при смене пользователя списки очищаются', async () => {
     const auth = useAuthStore()
     auth.user = { id: 1 } as User

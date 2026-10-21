@@ -180,3 +180,14 @@ a {
 .form-modal .error {
   margin-bottom: 16px;
 }
+
+/* Кнопка, которая выглядит как ссылка в тексте подсказки: «сбросить», «подставить». */
+.link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-gold);
+  font: inherit;
+  text-decoration: underline dotted;
+  cursor: pointer;
+}

@@ -73,7 +73,7 @@ async function save() {
       <NSelect v-model:value="form.timezone" :options="timezoneOptions" filterable />
       <template v-if="browserTimezone && browserTimezone !== form.timezone" #feedback>
         На устройстве {{ browserTimezone }} ·
-        <button type="button" class="link" @click="form.timezone = browserTimezone">
+        <button type="button" class="link-button" @click="form.timezone = browserTimezone">
           подставить
         </button>
       </template>
@@ -115,15 +115,5 @@ async function save() {
 
 .error {
   margin-bottom: 16px;
-}
-
-.link {
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--color-gold);
-  font: inherit;
-  text-decoration: underline dotted;
-  cursor: pointer;
 }
 </style>
