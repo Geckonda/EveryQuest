@@ -4,6 +4,7 @@ from sqlalchemy import select
 from app.crud import apply_changes, ensure_can_archive, get_owned
 from app.db import DbSession
 from app.deps import CurrentUser
+from app.limits import ensure_tier_room
 from app.models import Tier
 from app.schemas import ArchiveConflict, TierCreate, TierOut, TierUpdate
 
@@ -20,6 +21,7 @@ def list_tiers(user: CurrentUser, db: DbSession, include_archived: bool = False)
 
 @router.post("", status_code=status.HTTP_201_CREATED)
 def create_tier(data: TierCreate, user: CurrentUser, db: DbSession) -> TierOut:
+    ensure_tier_room(db, user.id)
     tier = Tier(user_id=user.id, **data.model_dump())
     db.add(tier)
     db.commit()
@@ -32,6 +34,8 @@ def update_tier(tier_id: int, data: TierUpdate, user: CurrentUser, db: DbSession
     changes = data.changes()
     if changes.get("is_archived") and not tier.is_archived:
         ensure_can_archive(db, "tier_id", tier.id)
+    if changes.get("is_archived") is False and tier.is_archived:
+        ensure_tier_room(db, user.id)
     apply_changes(tier, changes)
     db.commit()
     return TierOut.model_validate(tier)

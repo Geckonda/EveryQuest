@@ -52,6 +52,7 @@ def test_quests_by_local_dates(
                 due_at=due,
                 status=status,
                 close_reason=reason,
+                closed_at=None if status == "active" else due,
             )
         )
 

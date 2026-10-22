@@ -149,15 +149,24 @@ def test_transactions_history(client: TestClient, headers: dict[str, str]) -> No
         ("quest_reward", 100, 100, "Работа"),
     ]
 
-    first = client.get(f"{API}/transactions?limit=1&offset=1", headers=headers).json()
+    first = client.get(f"{API}/transactions?limit=1", headers=headers).json()
     assert first["total"] == 3
-    assert [t["type"] for t in first["items"]] == ["purchase"]
+    assert [t["type"] for t in first["items"]] == ["manual"]
+    second = client.get(
+        f"{API}/transactions?limit=1&cursor={first['next_cursor']}", headers=headers
+    ).json()
+    assert second["total"] is None  # пересчёт — только на первой странице
+    assert [t["type"] for t in second["items"]] == ["purchase"]
 
     only_purchases = client.get(f"{API}/transactions?type=purchase", headers=headers).json()
     assert only_purchases["total"] == 1
 
     stranger = auth_headers(register(client, email="stranger@example.com"))
-    assert client.get(f"{API}/transactions", headers=stranger).json() == {"items": [], "total": 0}
+    assert client.get(f"{API}/transactions", headers=stranger).json() == {
+        "items": [],
+        "total": 0,
+        "next_cursor": None,
+    }
 
 
 def test_today_summary(client: TestClient, db: Session, headers: dict[str, str]) -> None:

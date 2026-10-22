@@ -6,6 +6,7 @@ from app.db import DbSession
 from app.deps import CurrentUser
 from app.economy import default_penalty, utcnow
 from app.jobs import generate_instance
+from app.limits import ensure_template_room
 from app.models import RecurringQuest, User
 from app.recurrence import local_today, next_due_at
 from app.schemas import (
@@ -41,6 +42,7 @@ def list_recurring(
 def create_recurring(
     data: RecurringQuestCreate, user: CurrentUser, db: DbSession
 ) -> RecurringQuestOut:
+    ensure_template_room(db, user.id)
     tier = check_quest_refs(db, user, data.tier_id, data.category_id)
     now = utcnow()
     start_date = data.start_date or local_today(user.timezone, now)
@@ -77,6 +79,8 @@ def update_recurring(
     """Изменения касаются только будущих экземпляров; уже созданный квест не меняется."""
     template = get_owned(db, RecurringQuest, template_id, user)
     changes = data.changes()
+    if changes.get("is_archived") is False and template.is_archived:
+        ensure_template_room(db, user.id)
 
     if "tier_id" in changes or "category_id" in changes:
         tier = check_quest_refs(

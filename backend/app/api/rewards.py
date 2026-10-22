@@ -6,6 +6,7 @@ from app.crud import apply_changes, get_owned
 from app.db import DbSession
 from app.deps import CurrentUser
 from app.economy import InsufficientFunds, purchase
+from app.limits import ensure_reward_room
 from app.models import Reward
 from app.schemas import PurchaseOut, RewardCreate, RewardOut, RewardSessionOut, RewardUpdate
 
@@ -24,6 +25,7 @@ def list_rewards(
 
 @router.post("", status_code=status.HTTP_201_CREATED)
 def create_reward(data: RewardCreate, user: CurrentUser, db: DbSession) -> RewardOut:
+    ensure_reward_room(db, user.id)
     reward = Reward(user_id=user.id, **data.model_dump())
     db.add(reward)
     db.commit()
@@ -36,7 +38,10 @@ def update_reward(
 ) -> RewardOut:
     # Архивация трат ничем не ограничена: покупки ссылаются на трату, но остаются в журнале.
     reward = get_owned(db, Reward, reward_id, user)
-    apply_changes(reward, data.changes())
+    changes = data.changes()
+    if changes.get("is_archived") is False and reward.is_archived:
+        ensure_reward_room(db, user.id)
+    apply_changes(reward, changes)
     db.commit()
     return RewardOut.model_validate(reward)
 

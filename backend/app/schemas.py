@@ -245,6 +245,13 @@ class QuestUpdate(PatchModel):
     status: Literal["archived"] | None = None
 
 
+class QuestPage(BaseModel):
+    """Страница архива квестов: свежезакрытые сверху."""
+
+    items: list[QuestOut]
+    next_cursor: str | None = None
+
+
 class QuestClosed(BaseModel):
     """Ответ на сдачу или провал квеста: квест и новый баланс."""
 
@@ -387,7 +394,10 @@ class TransactionOut(ORMModel):
 
 class TransactionPage(BaseModel):
     items: list[TransactionOut]
-    total: int
+    # Только на первой странице (без курсора): пересчитывать всё на каждой — дорого.
+    total: int | None = None
+    # Курсор следующей страницы; None — дальше записей нет.
+    next_cursor: str | None = None
 
 
 class BalanceChange(BaseModel):

@@ -167,6 +167,9 @@ class Quest(Base):
             " OR (status = 'archived' AND close_reason = 'archived')",
             name="close_reason",
         ),
+        # У закрытого квеста всегда есть момент закрытия — по нему листается архив.
+        CheckConstraint("(status = 'active') = (closed_at IS NULL)", name="closed_at"),
+        Index("ix_quests_user_id_closed_at_id", "user_id", "closed_at", "id"),
         UniqueConstraint("recurring_quest_id", "period_date"),
         Index("ix_quests_status_due_at", "status", "due_at"),
     )
@@ -238,7 +241,8 @@ class Transaction(Base):
         CheckConstraint(
             "type IN ('quest_reward', 'penalty', 'purchase', 'manual', 'reversal')", name="type"
         ),
-        Index("ix_transactions_user_id_created_at", "user_id", "created_at"),
+        # С id: летопись листается курсором (created_at, id) — по индексу с любой глубины.
+        Index("ix_transactions_user_id_created_at_id", "user_id", "created_at", "id"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)

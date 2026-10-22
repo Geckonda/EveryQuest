@@ -84,9 +84,15 @@ def test_untouched_quests(db: Session, user_id: int) -> None:
             due_at=NOW - timedelta(hours=1),
             status="completed",
             close_reason="completed",
+            closed_at=NOW - timedelta(hours=2),
         ),
         add_quest(
-            db, user_id, due_at=NOW - timedelta(hours=1), status="archived", close_reason="archived"
+            db,
+            user_id,
+            due_at=NOW - timedelta(hours=1),
+            status="archived",
+            close_reason="archived",
+            closed_at=NOW - timedelta(hours=2),
         ),
     ]
 

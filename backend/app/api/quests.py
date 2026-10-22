@@ -2,15 +2,24 @@ from datetime import datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, status
-from sqlalchemy import select
+from sqlalchemy import select, tuple_
 from sqlalchemy.orm import Session
 
 from app.crud import apply_changes, check_quest_refs, get_owned
 from app.db import DbSession
 from app.deps import CurrentUser
 from app.economy import default_penalty, lock_quest, lock_user, record_transaction, utcnow
+from app.limits import ensure_quest_room
 from app.models import Quest, User
-from app.schemas import QuestClosed, QuestCreate, QuestOut, QuestStatus, QuestUpdate
+from app.pagination import MAX_PAGE_SIZE, PAGE_SIZE, decode_cursor, encode_cursor
+from app.schemas import (
+    QuestClosed,
+    QuestCreate,
+    QuestOut,
+    QuestPage,
+    QuestStatus,
+    QuestUpdate,
+)
 
 router = APIRouter(prefix="/quests", tags=["quests"])
 
@@ -67,8 +76,33 @@ def list_quests(
     return [QuestOut.model_validate(quest) for quest in quests]
 
 
+@router.get("/archive")
+def quest_archive(
+    user: CurrentUser,
+    db: DbSession,
+    cursor: str | None = None,
+    limit: Annotated[int, Query(ge=1, le=MAX_PAGE_SIZE)] = PAGE_SIZE,
+) -> QuestPage:
+    """Закрытые квесты страницами, свежезакрытые сверху. cursor — next_cursor прошлой страницы."""
+    query = select(Quest).where(Quest.user_id == user.id, Quest.closed_at.is_not(None))
+    if cursor is not None:
+        closed_at, quest_id = decode_cursor(cursor)
+        query = query.where(tuple_(Quest.closed_at, Quest.id) < (closed_at, quest_id))
+    # На одну больше — так видно, есть ли следующая страница, без отдельного подсчёта.
+    rows = db.scalars(
+        query.order_by(Quest.closed_at.desc(), Quest.id.desc()).limit(limit + 1)
+    ).all()
+    page = rows[:limit]
+    last = page[-1] if len(rows) > limit else None
+    return QuestPage(
+        items=[QuestOut.model_validate(quest) for quest in page],
+        next_cursor=encode_cursor(last.closed_at, last.id) if last and last.closed_at else None,
+    )
+
+
 @router.post("", status_code=status.HTTP_201_CREATED)
 def create_quest(data: QuestCreate, user: CurrentUser, db: DbSession) -> QuestOut:
+    ensure_quest_room(db, user.id)
     tier = check_quest_refs(db, user, data.tier_id, data.category_id)
     _check_due_at(data.due_at)
     reward = tier.default_reward if data.reward is None else data.reward

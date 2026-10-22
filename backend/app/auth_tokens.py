@@ -4,13 +4,14 @@
 """
 
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.economy import utcnow
+from app.limits import MAX_SESSIONS
 from app.models import AuthSession
 from app.security import hash_token, new_refresh_token
 
@@ -30,9 +31,29 @@ class Refreshed:
     token: str | None
 
 
+def _evict_oldest(db: Session, user_id: int, now: datetime) -> None:
+    """Освобождает место под новую сессию: сверх MAX_SESSIONS выходят самые давние.
+
+    Иначе каждый вход (скрипт, частые входы) копил бы сессии на 30 дней — сотнями.
+    """
+    alive = db.scalars(
+        select(AuthSession)
+        .where(
+            AuthSession.user_id == user_id,
+            AuthSession.revoked_at.is_(None),
+            AuthSession.expires_at > now,
+        )
+        .order_by(AuthSession.last_used_at.desc(), AuthSession.id.desc())
+        .offset(MAX_SESSIONS - 1)
+    ).all()
+    for session in alive:
+        session.revoked_at = now
+
+
 def start_session(db: Session, user_id: int, user_agent: str | None) -> tuple[AuthSession, str]:
     token = new_refresh_token()
     now = utcnow()
+    _evict_oldest(db, user_id, now)
     session = AuthSession(
         user_id=user_id,
         token_hash=hash_token(token),

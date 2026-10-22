@@ -4,6 +4,7 @@ from sqlalchemy import select
 from app.crud import apply_changes, ensure_can_archive, get_owned
 from app.db import DbSession
 from app.deps import CurrentUser
+from app.limits import ensure_category_room
 from app.models import Category
 from app.schemas import ArchiveConflict, CategoryCreate, CategoryOut, CategoryUpdate
 
@@ -22,6 +23,7 @@ def list_categories(
 
 @router.post("", status_code=status.HTTP_201_CREATED)
 def create_category(data: CategoryCreate, user: CurrentUser, db: DbSession) -> CategoryOut:
+    ensure_category_room(db, user.id)
     category = Category(user_id=user.id, **data.model_dump())
     db.add(category)
     db.commit()
@@ -36,6 +38,8 @@ def update_category(
     changes = data.changes()
     if changes.get("is_archived") and not category.is_archived:
         ensure_can_archive(db, "category_id", category.id)
+    if changes.get("is_archived") is False and category.is_archived:
+        ensure_category_room(db, user.id)
     apply_changes(category, changes)
     db.commit()
     return CategoryOut.model_validate(category)

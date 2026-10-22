@@ -3,13 +3,14 @@ from typing import Annotated
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, HTTPException, Query, status
-from sqlalchemy import func, select
+from sqlalchemy import func, select, tuple_
 from sqlalchemy.orm import Session
 
 from app.db import DbSession
 from app.deps import CurrentUser
 from app.economy import InsufficientFunds, manual_adjust, utcnow
 from app.models import Quest, Reward, Transaction
+from app.pagination import MAX_PAGE_SIZE, PAGE_SIZE, decode_cursor, encode_cursor
 from app.recurrence import local_today
 from app.schemas import (
     BalanceChange,
@@ -38,28 +39,42 @@ def list_transactions(
     user: CurrentUser,
     db: DbSession,
     type_: Annotated[TransactionType | None, Query(alias="type")] = None,
-    limit: Annotated[int, Query(ge=1, le=200)] = 50,
-    offset: Annotated[int, Query(ge=0)] = 0,
+    cursor: str | None = None,
+    limit: Annotated[int, Query(ge=1, le=MAX_PAGE_SIZE)] = PAGE_SIZE,
 ) -> TransactionPage:
+    """Летопись страницами, новые сверху. cursor — next_cursor прошлой страницы."""
     condition = Transaction.user_id == user.id
     if type_ is not None:
         condition &= Transaction.type == type_
 
-    total = db.scalar(select(func.count()).select_from(Transaction).where(condition))
+    # Общее число — только для первой страницы: на каждой пересчитывать всё дорого.
+    total = None
+    if cursor is None:
+        total = db.scalar(select(func.count()).select_from(Transaction).where(condition)) or 0
+    else:
+        created_at, transaction_id = decode_cursor(cursor)
+        condition &= tuple_(Transaction.created_at, Transaction.id) < (created_at, transaction_id)
+
     rows = db.execute(
         select(Transaction, func.coalesce(Quest.name, Reward.name))
         .outerjoin(Quest, Quest.id == Transaction.quest_id)
         .outerjoin(Reward, Reward.id == Transaction.reward_id)
         .where(condition)
         .order_by(Transaction.created_at.desc(), Transaction.id.desc())
-        .limit(limit)
-        .offset(offset)
+        # На одну больше — так видно, есть ли следующая страница.
+        .limit(limit + 1)
     ).all()
+    page = rows[:limit]
+    last = page[-1][0] if len(rows) > limit else None
     items = [
         TransactionOut.model_validate(transaction).model_copy(update={"title": title})
-        for transaction, title in rows
+        for transaction, title in page
     ]
-    return TransactionPage(items=items, total=total or 0)
+    return TransactionPage(
+        items=items,
+        total=total,
+        next_cursor=encode_cursor(last.created_at, last.id) if last else None,
+    )
 
 
 @router.get("/today")
