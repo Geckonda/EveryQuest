@@ -6,6 +6,7 @@ import { errorMessage } from '@/api/errors'
 import { useCatalogStore } from '@/stores/catalog'
 import { useRecurringStore } from '@/stores/recurring'
 import { useArchiveToggle } from '@/composables/useArchiveToggle'
+import { useRemove } from '@/composables/useRemove'
 import { dueLabel } from '@/utils/format'
 import { describeSchedule } from '@/utils/schedule'
 import CatalogSection from './CatalogSection.vue'
@@ -42,6 +43,18 @@ async function togglePause(template: RecurringQuest) {
   }
 }
 
+const remove = useRemove()
+
+function removeTemplate(template: RecurringQuest) {
+  remove({
+    title: `Удалить «${template.name}»?`,
+    content:
+      'Повторяющийся квест исчезнет насовсем, новые экземпляры больше не появятся. Уже созданные останутся на доске и в архиве как обычные квесты.',
+    action: () => recurring.remove(template.id),
+    done: `«${template.name}» удалён`,
+  })
+}
+
 const tierOf = (t: RecurringQuest) => catalog.tiers.find((tier) => tier.id === t.tier_id)
 </script>
 
@@ -56,6 +69,7 @@ const tierOf = (t: RecurringQuest) => catalog.tiers.find((tier) => tier.id === t
     @toggle-archive="
       (t) => toggleArchive(t, (is_archived) => recurring.save(t.id, { is_archived }))
     "
+    @remove="removeTemplate"
   >
     <template #item="{ item: t }">
       <div class="head">

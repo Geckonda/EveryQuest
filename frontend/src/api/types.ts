@@ -210,7 +210,8 @@ export interface DaySummary {
 /** Идущая трата с длительностью: «ТикТок на 20 минут». */
 export interface RewardSession {
   id: number
-  reward_id: number
+  /** null — позицию меню удалили. */
+  reward_id: number | null
   /** Название на момент заказа. */
   name: string
   started_at: string
@@ -226,6 +227,13 @@ export interface PurchaseResult extends BalanceChange {
 export interface ArchiveBlocker {
   id: number
   name: string
+}
+
+/** detail ответа 409 при удалении тира, у которого есть квесты: куда их перенести. */
+export interface TierInUse {
+  message: string
+  quests: number
+  recurring_quests: number
 }
 
 /** detail ответа 409 при архивации тира или категории. */

@@ -11,6 +11,7 @@ import type {
   TierPayload,
 } from '@/api/types'
 import { useAuthStore } from './auth'
+import { useQuestsStore } from './quests'
 import { useSessionsStore } from './sessions'
 
 type Comparator<T> = (a: T, b: T) => number
@@ -27,6 +28,7 @@ function upsert<T extends { id: number }>(list: Ref<T[]>, item: T, compare: Comp
 export const useCatalogStore = defineStore('catalog', () => {
   const auth = useAuthStore()
   const sessions = useSessionsStore()
+  const quests = useQuestsStore()
 
   const tiers = ref<Tier[]>([])
   const categories = ref<Category[]>([])
@@ -93,6 +95,26 @@ export const useCatalogStore = defineStore('catalog', () => {
     return result
   }
 
+  /** Удалить тир насовсем. moveTo — куда перенести квесты и шаблоны, если тир используется. */
+  async function removeTier(id: number, moveTo?: number) {
+    await api.delete(`/tiers/${id}${moveTo === undefined ? '' : `?move_to=${moveTo}`}`)
+    tiers.value = tiers.value.filter((t) => t.id !== id)
+    if (moveTo !== undefined) await quests.refresh()
+  }
+
+  /** Квесты и шаблоны этой категории станут «без категории». */
+  async function removeCategory(id: number) {
+    await api.delete(`/categories/${id}`)
+    categories.value = categories.value.filter((c) => c.id !== id)
+    await quests.refresh()
+  }
+
+  /** В летописи заказы останутся с названием. */
+  async function removeReward(id: number) {
+    await api.delete(`/rewards/${id}`)
+    rewards.value = rewards.value.filter((r) => r.id !== id)
+  }
+
   return {
     tiers,
     categories,
@@ -105,5 +127,8 @@ export const useCatalogStore = defineStore('catalog', () => {
     saveCategory,
     saveReward,
     purchase,
+    removeTier,
+    removeCategory,
+    removeReward,
   }
 })

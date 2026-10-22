@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { NAlert, NSpin, NTabPane, NTabs } from 'naive-ui'
-import type { Category, Tier } from '@/api/types'
+import type { Category, Tier, TierInUse } from '@/api/types'
 import { errorMessage } from '@/api/errors'
 import { useCatalogStore } from '@/stores/catalog'
 import { useArchiveToggle } from '@/composables/useArchiveToggle'
@@ -10,6 +10,9 @@ import CatalogSection from '@/components/CatalogSection.vue'
 import CoinIcon from '@/components/CoinIcon.vue'
 import TierSeal from '@/components/TierSeal.vue'
 import TierFormModal from '@/components/TierFormModal.vue'
+import TierMoveModal from '@/components/TierMoveModal.vue'
+import { useRemove } from '@/composables/useRemove'
+import { tierInUseOf } from '@/api/errors'
 import CategoryFormModal from '@/components/CategoryFormModal.vue'
 import ProfileSection from '@/components/ProfileSection.vue'
 import AppIcon from '@/components/AppIcon.vue'
@@ -41,6 +44,39 @@ function openTier(tier: Tier | null) {
   tierModal.value = true
 }
 
+const remove = useRemove()
+const moveModal = ref(false)
+const removedTier = ref<Tier | null>(null)
+const removedUsage = ref<TierInUse | null>(null)
+
+function removeTier(tier: Tier) {
+  remove({
+    title: `Удалить тир «${tier.name}»?`,
+    content:
+      'Тир исчезнет насовсем. Если у него есть квесты, следующим шагом выберете, куда их перенести.',
+    action: () => catalog.removeTier(tier.id),
+    done: `Тир «${tier.name}» удалён`,
+    // Тир используется — спрашиваем, куда перенести квесты.
+    onError: (error) => {
+      const usage = tierInUseOf(error)
+      if (!usage) return false
+      removedTier.value = tier
+      removedUsage.value = usage
+      moveModal.value = true
+      return true
+    },
+  })
+}
+
+function removeCategory(category: Category) {
+  remove({
+    title: `Удалить категорию «${category.name}»?`,
+    content: 'Категория исчезнет насовсем, её квесты и повторяющиеся станут «без категории».',
+    action: () => catalog.removeCategory(category.id),
+    done: `Категория «${category.name}» удалена`,
+  })
+}
+
 function openCategory(category: Category | null) {
   editedCategory.value = category
   categoryModal.value = true
@@ -70,6 +106,7 @@ function openCategory(category: Category | null) {
             (tier) =>
               toggleArchive(tier, (is_archived) => catalog.saveTier(tier.id, { is_archived }))
           "
+          @remove="removeTier"
         >
           <template #item="{ item: tier }">
             <div class="line">
@@ -94,6 +131,7 @@ function openCategory(category: Category | null) {
                 catalog.saveCategory(category.id, { is_archived }),
               )
           "
+          @remove="removeCategory"
         >
           <template #item="{ item: category }">
             <div class="line">
@@ -114,6 +152,7 @@ function openCategory(category: Category | null) {
   </NSpin>
 
   <TierFormModal v-model:show="tierModal" :tier="editedTier" />
+  <TierMoveModal v-model:show="moveModal" :tier="removedTier" :usage="removedUsage" />
   <CategoryFormModal v-model:show="categoryModal" :category="editedCategory" />
 </template>
 

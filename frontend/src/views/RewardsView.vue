@@ -7,6 +7,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useCatalogStore } from '@/stores/catalog'
 import { useSessionsStore } from '@/stores/sessions'
 import { useArchiveToggle } from '@/composables/useArchiveToggle'
+import { useRemove } from '@/composables/useRemove'
 import { coins, formatTime } from '@/utils/format'
 import { DEFAULT_REWARD_FILTERS, filterRewards } from '@/utils/rewardFilters'
 import { flyCoins, purseElement } from '@/utils/coinFx'
@@ -49,6 +50,17 @@ onMounted(async () => {
     loading.value = false
   }
 })
+
+const remove = useRemove()
+
+function removeReward(reward: Reward) {
+  remove({
+    title: `Удалить «${reward.name}» из меню?`,
+    content: 'Позиция исчезнет насовсем. Прошлые заказы останутся в летописи с этим названием.',
+    action: () => catalog.removeReward(reward.id),
+    done: `«${reward.name}» удалена из меню`,
+  })
+}
 
 function open(reward: Reward | null) {
   edited.value = reward
@@ -131,6 +143,7 @@ function buy(reward: Reward, event: MouseEvent) {
         (reward) =>
           toggleArchive(reward, (is_archived) => catalog.saveReward(reward.id, { is_archived }))
       "
+      @remove="removeReward"
     >
       <template v-if="catalog.rewards.length" #toolbar>
         <div class="tools">

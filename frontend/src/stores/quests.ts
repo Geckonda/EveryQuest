@@ -47,6 +47,13 @@ export const useQuestsStore = defineStore('quests', () => {
     historyHasMore.value = page.next_cursor !== null
   }
 
+  /** Перечитать открытые и, если архив уже открывали, его первую страницу —
+   *  после удаления тира, категории или шаблона у квестов поменялись ссылки. */
+  async function refresh() {
+    await loadActive()
+    if (history.value.length || historyHasMore.value) await loadHistory()
+  }
+
   async function create(payload: QuestPayload) {
     const quest = await api.post<Quest>('/quests', payload)
     active.value = [...active.value, quest].sort(byDue)
@@ -88,6 +95,7 @@ export const useQuestsStore = defineStore('quests', () => {
     historyHasMore,
     loadActive,
     loadHistory,
+    refresh,
     create,
     update,
     complete,

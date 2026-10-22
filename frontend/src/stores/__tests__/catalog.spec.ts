@@ -70,4 +70,27 @@ describe('catalog store', () => {
     ])
     expect(catalog.tiers[1]!.name).toBe('Поднят')
   })
+
+  it('удаление тира с переносом — квесты перечитываются', async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockImplementation(async (url) =>
+        String(url).includes('/tiers/')
+          ? new Response(null, { status: 204 })
+          : new Response('[]', { status: 200, headers: { 'Content-Type': 'application/json' } }),
+      )
+    vi.stubGlobal('fetch', fetchMock)
+    const catalog = useCatalogStore()
+    catalog.tiers = [tier(1, 1), tier(2, 2)]
+
+    await catalog.removeTier(1, 2)
+
+    expect(String(fetchMock.mock.calls[0]?.[0])).toMatch(/\/tiers\/1\?move_to=2$/)
+    expect(fetchMock.mock.calls[0]?.[1]?.method).toBe('DELETE')
+    expect(catalog.tiers.map((t) => t.id)).toEqual([2])
+    // Квесты перечитаны: у них поменялся тир.
+    expect(
+      fetchMock.mock.calls.some(([url]) => String(url).includes('/quests?status=active')),
+    ).toBe(true)
+  })
 })

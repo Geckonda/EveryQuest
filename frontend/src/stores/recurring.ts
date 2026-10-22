@@ -38,5 +38,12 @@ export const useRecurringStore = defineStore('recurring', () => {
     return template
   }
 
-  return { templates, load, save }
+  /** Удалить шаблон; уже созданные по нему квесты остаются обычными. */
+  async function remove(id: number) {
+    await api.delete(`/recurring-quests/${id}`)
+    templates.value = templates.value.filter((t) => t.id !== id)
+    await quests.refresh()
+  }
+
+  return { templates, load, save, remove }
 })

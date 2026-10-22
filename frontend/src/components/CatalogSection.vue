@@ -15,6 +15,7 @@ defineEmits<{
   add: []
   edit: [item: T]
   toggleArchive: [item: T]
+  remove: [item: T]
 }>()
 
 defineSlots<{
@@ -56,6 +57,9 @@ const visible = computed(() =>
           </NButton>
           <NButton size="small" quaternary @click="$emit('toggleArchive', item)">
             {{ item.is_archived ? 'Вернуть' : 'В архив' }}
+          </NButton>
+          <NButton size="small" quaternary type="error" @click="$emit('remove', item)">
+            Удалить
           </NButton>
         </div>
       </li>
