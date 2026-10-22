@@ -20,7 +20,11 @@ const props = defineProps<{
 defineEmits<{ complete: [event: MouseEvent]; fail: []; edit: []; archive: []; undo: [] }>()
 
 const isActive = computed(() => props.quest.status === 'active')
-const due = computed(() => (props.quest.due_at ? dueLabel(props.quest.due_at, props.now) : null))
+// Срок и просрочка — только у открытого квеста. Закрытый (сдан, провален, снят) свою судьбу
+// уже получил: иначе сданный вовремя квест с прошедшим сроком краснел бы с «гильдия взыщет штраф».
+const due = computed(() =>
+  isActive.value && props.quest.due_at ? dueLabel(props.quest.due_at, props.now) : null,
+)
 /** Живой отсчёт — только у открытого квеста со сроком. */
 const timer = computed(() =>
   isActive.value && props.quest.due_at
