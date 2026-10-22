@@ -180,9 +180,17 @@ export interface Transaction {
   title: string | null
 }
 
+/** Страница летописи. total — только на первой странице; next_cursor null — дальше пусто. */
 export interface TransactionPage {
   items: Transaction[]
-  total: number
+  total: number | null
+  next_cursor: string | null
+}
+
+/** Страница архива квестов. */
+export interface QuestPage {
+  items: Quest[]
+  next_cursor: string | null
 }
 
 export interface BalanceChange {

@@ -93,29 +93,40 @@ describe('quests store', () => {
     expect(auth.user?.balance).toBe(-5)
   })
 
-  it('архив грузится страницами без повторов', async () => {
+  it('архив грузится страницами по курсору', async () => {
     const closed = (id: number) =>
       quest(id, null, { status: 'completed', close_reason: 'completed' })
-    const firstPage = Array.from({ length: 50 }, (_, i) => closed(100 - i))
     const fetchMock = vi
       .fn<typeof fetch>()
-      .mockResolvedValueOnce(json(firstPage))
-      // Пока листали, закрыли ещё квест — offset сдвинулся, квест 51 пришёл повторно.
-      .mockResolvedValueOnce(json([closed(51), closed(50)]))
+      .mockResolvedValueOnce(json({ items: [closed(3), closed(2)], next_cursor: 'c2' }))
+      .mockResolvedValueOnce(json({ items: [closed(1)], next_cursor: null }))
     vi.stubGlobal('fetch', fetchMock)
     const quests = useQuestsStore()
 
     await quests.loadHistory()
+    expect(String(fetchMock.mock.calls[0]?.[0])).toMatch(/\/quests\/archive\?limit=50$/)
     expect(quests.historyHasMore).toBe(true)
-    const url = String(fetchMock.mock.calls[0]?.[0])
-    expect(url).toContain('status=completed&status=failed&status=archived')
-    expect(url).toContain('offset=0')
 
     await quests.loadHistory(true)
-    expect(String(fetchMock.mock.calls[1]?.[0])).toContain('offset=50')
-    expect(quests.history).toHaveLength(51)
-    expect(quests.history[50]?.id).toBe(50)
+    expect(String(fetchMock.mock.calls[1]?.[0])).toContain('cursor=c2')
+    expect(quests.history.map((q) => q.id)).toEqual([3, 2, 1])
     expect(quests.historyHasMore).toBe(false)
+  })
+
+  it('закрытый здесь же квест не задваивается при дозагрузке', async () => {
+    const closed = (id: number) =>
+      quest(id, null, { status: 'completed', close_reason: 'completed' })
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(json({ items: [closed(2)], next_cursor: 'c' }))
+      .mockResolvedValueOnce(json({ items: [closed(2), closed(1)], next_cursor: null }))
+    vi.stubGlobal('fetch', fetchMock)
+    const quests = useQuestsStore()
+
+    await quests.loadHistory()
+    await quests.loadHistory(true)
+
+    expect(quests.history.map((q) => q.id)).toEqual([2, 1])
   })
 
   it('отмена возвращает квест на доску и баланс из ответа', async () => {

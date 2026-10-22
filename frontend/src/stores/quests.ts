@@ -1,7 +1,7 @@
 import { ref, watch } from 'vue'
 import { defineStore } from 'pinia'
 import { api } from '@/api/client'
-import type { Quest, QuestClosed, QuestPayload } from '@/api/types'
+import type { Quest, QuestClosed, QuestPage, QuestPayload } from '@/api/types'
 import { byDue } from '@/utils/questFilters'
 import { useAuthStore } from './auth'
 
@@ -29,20 +29,22 @@ export const useQuestsStore = defineStore('quests', () => {
     active.value = await api.get<Quest[]>('/quests?status=active')
   }
 
-  /** Архив страницами, свежезакрытые сверху. more — дозагрузить следующую страницу. */
+  /** Курсор следующей страницы архива; null — дальше пусто. */
+  let historyCursor: string | null = null
+
+  /**
+   * Архив страницами по курсору, свежезакрытые сверху. more — следующая страница.
+   * Курсор, а не сдвиг: квесты, закрытые пока листали, не сдвигают страницы.
+   */
   async function loadHistory(more = false) {
-    const params = new URLSearchParams([
-      ['status', 'completed'],
-      ['status', 'failed'],
-      ['status', 'archived'],
-      ['limit', String(HISTORY_PAGE)],
-      ['offset', String(more ? history.value.length : 0)],
-    ])
-    const page = await api.get<Quest[]>(`/quests?${params}`)
-    // Квесты, закрытые после загрузки первой страницы, сдвигают offset — убираем повторы.
+    const params = new URLSearchParams({ limit: String(HISTORY_PAGE) })
+    if (more && historyCursor) params.set('cursor', historyCursor)
+    const page = await api.get<QuestPage>(`/quests/archive?${params}`)
+    // Закрытые здесь же (сдал, провалил) уже добавлены в начало локально — не повторяем.
     const known = new Set(more ? history.value.map((q) => q.id) : [])
-    history.value = [...(more ? history.value : []), ...page.filter((q) => !known.has(q.id))]
-    historyHasMore.value = page.length === HISTORY_PAGE
+    history.value = [...(more ? history.value : []), ...page.items.filter((q) => !known.has(q.id))]
+    historyCursor = page.next_cursor
+    historyHasMore.value = page.next_cursor !== null
   }
 
   async function create(payload: QuestPayload) {

@@ -26,28 +26,36 @@ const typeOptions = [
 ]
 
 const items = ref<Transaction[]>([])
+/** Сколько всего записей под фильтром — с первой страницы. */
 const total = ref(0)
+/** Курсор следующей страницы; null — дальше пусто. */
+const cursor = ref<string | null>(null)
 const filter = ref<TransactionType | 'all'>('all')
 const loading = ref(false)
 const error = ref<string | null>(null)
 const manualModal = ref(false)
 
+// Номер последнего запроса: быстро сменили фильтр — ответ на старый не перезапишет список.
+let requestId = 0
+
+/** reset — первая страница (смена фильтра), иначе следующая по курсору. */
 async function load(reset: boolean) {
+  const id = ++requestId
   loading.value = true
   error.value = null
-  const params = new URLSearchParams({
-    limit: String(PAGE_SIZE),
-    offset: String(reset ? 0 : items.value.length),
-  })
+  const params = new URLSearchParams({ limit: String(PAGE_SIZE) })
   if (filter.value !== 'all') params.set('type', filter.value)
+  if (!reset && cursor.value) params.set('cursor', cursor.value)
   try {
     const page = await api.get<TransactionPage>(`/transactions?${params}`)
+    if (id !== requestId) return
     items.value = reset ? page.items : [...items.value, ...page.items]
-    total.value = page.total
+    if (page.total !== null) total.value = page.total
+    cursor.value = page.next_cursor
   } catch (e) {
-    error.value = errorMessage(e)
+    if (id === requestId) error.value = errorMessage(e)
   } finally {
-    loading.value = false
+    if (id === requestId) loading.value = false
   }
 }
 
@@ -101,15 +109,9 @@ onMounted(() => load(true))
         </div>
       </li>
     </ul>
-    <NButton
-      v-if="items.length < total"
-      block
-      quaternary
-      :loading="loading"
-      class="more"
-      @click="load(false)"
-    >
-      Показать ещё ({{ total - items.length }})
+    <NButton v-if="cursor" block quaternary :loading="loading" class="more" @click="load(false)">
+      Показать ещё
+      <template v-if="total > items.length">({{ total - items.length }})</template>
     </NButton>
   </NSpin>
 
