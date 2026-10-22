@@ -410,7 +410,7 @@ class BalanceChange(BaseModel):
 
 class RewardSessionOut(ORMModel):
     id: int
-    reward_id: int
+    reward_id: int | None
     name: str
     started_at: datetime
     ends_at: datetime

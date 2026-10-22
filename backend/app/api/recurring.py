@@ -3,6 +3,7 @@ from sqlalchemy import select
 
 from app.crud import apply_changes, check_quest_refs, get_owned
 from app.db import DbSession
+from app.deletion import delete_template
 from app.deps import CurrentUser
 from app.economy import default_penalty, utcnow
 from app.jobs import generate_instance
@@ -114,3 +115,10 @@ def update_recurring(
         generate_instance(db, template, user.timezone, utcnow())
     db.commit()
     return _out(template, user)
+
+
+@router.delete("/{template_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_recurring(template_id: int, user: CurrentUser, db: DbSession) -> None:
+    """Удалить насовсем; уже созданные по нему квесты останутся обычными."""
+    delete_template(db, get_owned(db, RecurringQuest, template_id, user))
+    db.commit()

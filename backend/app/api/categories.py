@@ -3,6 +3,7 @@ from sqlalchemy import select
 
 from app.crud import apply_changes, ensure_can_archive, get_owned
 from app.db import DbSession
+from app.deletion import delete_category
 from app.deps import CurrentUser
 from app.limits import ensure_category_room
 from app.models import Category
@@ -43,3 +44,10 @@ def update_category(
     apply_changes(category, changes)
     db.commit()
     return CategoryOut.model_validate(category)
+
+
+@router.delete("/{category_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_category(category_id: int, user: CurrentUser, db: DbSession) -> None:
+    """Удалить насовсем: квесты и шаблоны этой категории станут «без категории»."""
+    delete_category(db, get_owned(db, Category, category_id, user))
+    db.commit()

@@ -222,7 +222,8 @@ class RewardSession(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    reward_id: Mapped[int] = mapped_column(ForeignKey("rewards.id"), nullable=False)
+    # NULL — позицию меню удалили; название сеанс хранит сам (name).
+    reward_id: Mapped[int | None] = mapped_column(ForeignKey("rewards.id"))
     # Одна покупка — один сеанс.
     transaction_id: Mapped[int] = mapped_column(
         ForeignKey("transactions.id"), unique=True, nullable=False
@@ -255,4 +256,6 @@ class Transaction(Base):
     balance_after: Mapped[int] = mapped_column(Integer, nullable=False)
     # Комментарий к ручной корректировке.
     note: Mapped[str | None] = mapped_column(Text)
+    # Название позиции меню, сохранённое при её удалении — чтобы летопись не обезличилась.
+    title_snapshot: Mapped[str | None] = mapped_column(String(200))
     created_at: Mapped[datetime] = created_at_column()

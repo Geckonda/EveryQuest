@@ -31,6 +31,7 @@ def transaction_out(db: Session, transaction: Transaction) -> TransactionOut:
         title = db.scalar(select(Quest.name).where(Quest.id == transaction.quest_id))
     elif transaction.reward_id is not None:
         title = db.scalar(select(Reward.name).where(Reward.id == transaction.reward_id))
+    title = title or transaction.title_snapshot
     return TransactionOut.model_validate(transaction).model_copy(update={"title": title})
 
 
@@ -56,7 +57,7 @@ def list_transactions(
         condition &= tuple_(Transaction.created_at, Transaction.id) < (created_at, transaction_id)
 
     rows = db.execute(
-        select(Transaction, func.coalesce(Quest.name, Reward.name))
+        select(Transaction, func.coalesce(Quest.name, Reward.name, Transaction.title_snapshot))
         .outerjoin(Quest, Quest.id == Transaction.quest_id)
         .outerjoin(Reward, Reward.id == Transaction.reward_id)
         .where(condition)

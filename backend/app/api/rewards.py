@@ -4,6 +4,7 @@ from sqlalchemy import select
 from app.api.transactions import transaction_out
 from app.crud import apply_changes, get_owned
 from app.db import DbSession
+from app.deletion import delete_reward
 from app.deps import CurrentUser
 from app.economy import InsufficientFunds, purchase
 from app.limits import ensure_reward_room
@@ -44,6 +45,13 @@ def update_reward(
     apply_changes(reward, changes)
     db.commit()
     return RewardOut.model_validate(reward)
+
+
+@router.delete("/{reward_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_reward(reward_id: int, user: CurrentUser, db: DbSession) -> None:
+    """Удалить насовсем; в летописи заказы останутся с названием."""
+    delete_reward(db, get_owned(db, Reward, reward_id, user))
+    db.commit()
 
 
 @router.post("/{reward_id}/purchase", responses={400: {"description": "Не хватает монет"}})

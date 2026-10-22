@@ -3,6 +3,7 @@ from sqlalchemy import select
 
 from app.crud import apply_changes, ensure_can_archive, get_owned
 from app.db import DbSession
+from app.deletion import delete_tier
 from app.deps import CurrentUser
 from app.limits import ensure_tier_room
 from app.models import Tier
@@ -39,3 +40,13 @@ def update_tier(tier_id: int, data: TierUpdate, user: CurrentUser, db: DbSession
     apply_changes(tier, changes)
     db.commit()
     return TierOut.model_validate(tier)
+
+
+@router.delete("/{tier_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_tier(tier_id: int, user: CurrentUser, db: DbSession, move_to: int | None = None) -> None:
+    """Удалить насовсем. Если у тира есть квесты или шаблоны — 409 с их числом;
+    повторить с move_to: квесты и шаблоны переедут в этот тир."""
+    tier = get_owned(db, Tier, tier_id, user)
+    target = get_owned(db, Tier, move_to, user) if move_to is not None else None
+    delete_tier(db, tier, target)
+    db.commit()
