@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onUnmounted, watch } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 import { NPopover, useMessage } from 'naive-ui'
 import { useNow } from '@/composables/useNow'
 import { useSessionsStore } from '@/stores/sessions'
@@ -73,25 +73,61 @@ watch(
 )
 
 onUnmounted(() => timers.forEach(clearTimeout))
+
+// Список привязан к точке, а не к плашке: на узком телефоне слева от плашки места мало,
+// и Naive разворачивал список вправо — за край экрана, раздвигая страницу.
+const EDGE = 12
+const MIN_RIGHT = 340
+const trigger = ref<HTMLButtonElement | null>(null)
+const open = ref(false)
+const point = ref({ x: 0, y: 0 })
+
+function toggle() {
+  if (open.value) {
+    open.value = false
+    return
+  }
+  const rect = trigger.value!.getBoundingClientRect()
+  // Правый край списка — по правому краю плашки; на узком экране сдвигаем вправо,
+  // но не ближе EDGE к краю. Ширина списка — не больше места слева от этой точки.
+  const x = Math.min(window.innerWidth - EDGE, Math.max(rect.right, MIN_RIGHT))
+  point.value = { x, y: rect.bottom + 4 }
+  open.value = true
+}
+
+function onClickOutside(event: MouseEvent) {
+  // Нажатие на саму плашку закрывает список в toggle.
+  if (!trigger.value?.contains(event.target as Node)) open.value = false
+}
 </script>
 
 <template>
-  <NPopover v-if="nearest" trigger="click" placement="bottom-end" :show-arrow="false">
-    <template #trigger>
-      <button
-        type="button"
-        class="session"
-        :class="nearest.timer.urgency"
-        :title="`Идёт: ${nearest.name}`"
-      >
-        <AppIcon name="hourglass" :size="16" class="hourglass" />
-        <span class="name">{{ nearest.name }}</span>
-        <span v-if="nearest.waiting" class="left num">с {{ formatTime(nearest.started_at) }}</span>
-        <span v-else class="left num">{{ nearest.timer.left }}</span>
-        <span v-if="rows.length > 1" class="more">+{{ rows.length - 1 }}</span>
-      </button>
-    </template>
-
+  <button
+    v-if="nearest"
+    ref="trigger"
+    type="button"
+    class="session"
+    :class="nearest.timer.urgency"
+    :title="`Идёт: ${nearest.name}`"
+    :aria-expanded="open"
+    @click="toggle"
+  >
+    <AppIcon name="hourglass" :size="16" class="hourglass" />
+    <span class="name">{{ nearest.name }}</span>
+    <span v-if="nearest.waiting" class="left num">с {{ formatTime(nearest.started_at) }}</span>
+    <span v-else class="left num">{{ nearest.timer.left }}</span>
+    <span v-if="rows.length > 1" class="more">+{{ rows.length - 1 }}</span>
+  </button>
+  <NPopover
+    :show="open && !!nearest"
+    trigger="manual"
+    :x="point.x"
+    :y="point.y"
+    placement="bottom-end"
+    :show-arrow="false"
+    :style="{ maxWidth: `${point.x - EDGE}px` }"
+    @clickoutside="onClickOutside"
+  >
     <SessionList />
   </NPopover>
 </template>

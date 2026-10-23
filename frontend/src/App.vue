@@ -93,9 +93,9 @@ onUnmounted(() => document.removeEventListener('visibilitychange', onVisibilityC
       <NDialogProvider>
         <header class="sign">
           <div class="sign-row">
-            <RouterLink to="/" class="logo">
+            <RouterLink to="/" class="logo" aria-label="Ежеквестик — сегодня">
               <AppIcon name="tavern" :size="26" />
-              Ежеквестик
+              <span class="logo-text">Ежеквестик</span>
             </RouterLink>
             <div v-if="auth.user" class="account">
               <SessionTimer />
@@ -164,6 +164,9 @@ onUnmounted(() => document.removeEventListener('visibilitychange', onVisibilityC
   max-width: 960px;
   margin: 0 auto;
   padding: 10px 16px 6px;
+  /* Шапка не должна раздвигать страницу: телефон тогда уменьшает масштаб всего сайта.
+     clip, а не hidden, — всплывающие «+50» над кошелём по вертикали не обрезаются. */
+  overflow-x: clip;
 }
 
 .logo {
@@ -177,6 +180,7 @@ onUnmounted(() => document.removeEventListener('visibilitychange', onVisibilityC
   text-decoration: none;
   text-shadow: 0 1px 0 #000;
   white-space: nowrap;
+  flex: none;
 }
 
 .account {
@@ -235,6 +239,27 @@ onUnmounted(() => document.removeEventListener('visibilitychange', onVisibilityC
 
   .logo {
     font-size: 1.35rem;
+  }
+}
+
+/* Узкий телефон: таймер отдыха и кошель важнее названия — остаётся кружка-эмблема. */
+@media (max-width: 420px) {
+  .sign-row {
+    gap: 8px;
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+
+  .logo-text {
+    display: none;
+  }
+
+  .account {
+    gap: 6px;
+  }
+
+  .leave {
+    padding: 0 6px;
   }
 }
 
@@ -327,6 +352,14 @@ main {
 
   .tab.router-link-exact-active .icon {
     filter: drop-shadow(0 0 4px rgba(231, 178, 79, 0.6));
+  }
+}
+
+/* 320–360px: на вкладку ~53px — «Настройки» и «Календарь» помещаются целиком. */
+@media (max-width: 360px) {
+  .tab {
+    font-size: 0.625rem;
+    letter-spacing: -0.01em;
   }
 }
 </style>

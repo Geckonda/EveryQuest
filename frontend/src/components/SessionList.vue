@@ -87,6 +87,7 @@ async function finish(id: number, name: string, waiting: boolean) {
 
 .row-head {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   gap: 12px;
   font-weight: 700;

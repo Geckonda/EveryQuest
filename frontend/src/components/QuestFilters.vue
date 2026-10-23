@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { NBadge, NButton, NCollapseTransition, NInput, NSelect } from 'naive-ui'
+import { NButton, NCollapseTransition, NInput, NSelect } from 'naive-ui'
 import { useCatalogStore } from '@/stores/catalog'
 import { activeFilterCount, type QuestFilters } from '@/utils/questFilters'
 
@@ -56,16 +56,19 @@ const sortOptions = [
         size="small"
       />
       <NSelect v-model:value="filters.sort" :options="sortOptions" size="small" class="sort" />
-      <NBadge :value="count" :show="count > 0">
-        <NButton
-          size="small"
-          :type="expanded ? 'primary' : 'default'"
-          secondary
-          @click="expanded = !expanded"
-        >
-          Фильтры
-        </NButton>
-      </NBadge>
+      <!-- Счётчик внутри кнопки и место под него всегда занято: бейдж сверху выпирал
+           за край карточки, а кнопка не должна менять ширину при выборе фильтра. -->
+      <NButton
+        size="small"
+        :type="expanded ? 'primary' : 'default'"
+        secondary
+        @click="expanded = !expanded"
+      >
+        Фильтры
+        <span class="count num" :class="{ hidden: count === 0 }">
+          {{ count || '' }}
+        </span>
+      </NButton>
     </div>
 
     <NCollapseTransition :show="expanded">
@@ -118,6 +121,26 @@ const sortOptions = [
 
 .sort {
   width: 150px;
+}
+
+.count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--color-error);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.count.hidden {
+  visibility: hidden;
 }
 
 .panel {

@@ -208,3 +208,13 @@ a {
 :root {
   --tab-bar-height: 58px;
 }
+
+/* iPhone приближает страницу, если у поля ввода шрифт меньше 16px, — и не отдаляет обратно. */
+@media (pointer: coarse) {
+  input,
+  textarea,
+  .n-input .n-input__input-el,
+  .n-input .n-input__textarea-el {
+    font-size: 16px;
+  }
+}
