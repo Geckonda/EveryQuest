@@ -68,7 +68,7 @@ describe('filterQuests', () => {
     expect(ids(quests, { q: '  пробеж ' })).toEqual([1, 2])
   })
 
-  it('тиры, категории, повторяющиеся', () => {
+  it('тиры, категории, разовые и повторяющиеся', () => {
     const quests = [
       quest(1, { tier_id: 1, category_id: 10 }),
       quest(2, { tier_id: 2, category_id: 20, recurring_quest_id: 7 }),
@@ -76,7 +76,8 @@ describe('filterQuests', () => {
     ]
     expect(ids(quests, { tiers: [2, 3] })).toEqual([2, 3])
     expect(ids(quests, { categories: [10] })).toEqual([1])
-    expect(ids(quests, { onlyRecurring: true })).toEqual([2])
+    expect(ids(quests, { kind: 'recurring' })).toEqual([2])
+    expect(ids(quests, { kind: 'once' })).toEqual([1, 3])
   })
 
   it('сортировка по важности тира, внутри — по сроку', () => {
@@ -111,7 +112,7 @@ describe('activeFilterCount', () => {
         tiers: [1],
         categories: [2],
         due: 'none',
-        onlyRecurring: true,
+        kind: 'once',
       }),
     ).toBe(4)
   })

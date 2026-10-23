@@ -6,15 +6,18 @@ import { api } from '@/api/client'
 import type { DaySummary, Quest } from '@/api/types'
 import { errorMessage } from '@/api/errors'
 import { useQuestActions, useQuestNow } from '@/composables/useQuestActions'
+import { useQuestFilters } from '@/composables/useQuestFilters'
 import { useAuthStore } from '@/stores/auth'
 import { useCatalogStore } from '@/stores/catalog'
 import { useQuestsStore } from '@/stores/quests'
 import { useSessionsStore } from '@/stores/sessions'
 import { signed } from '@/utils/format'
-import { todayBoard } from '@/utils/today'
+import { activeFilterCount, filterQuests, questComparator } from '@/utils/questFilters'
+import { boardSize, todayBoard } from '@/utils/today'
 import CoinIcon from '@/components/CoinIcon.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import QuestCard from '@/components/QuestCard.vue'
+import QuestFilters from '@/components/QuestFilters.vue'
 import QuestFormModal from '@/components/QuestFormModal.vue'
 import SessionList from '@/components/SessionList.vue'
 import AppIcon from '@/components/AppIcon.vue'
@@ -65,8 +68,34 @@ const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
 const tierOf = (id: number) => catalog.tiers.find((t) => t.id === id)
 const categoryOf = (quest: Quest) => catalog.categories.find((c) => c.id === quest.category_id)
 
-const board = computed(() =>
-  todayBoard(quests.active, now.value, timezone.value, (id) => tierOf(id)?.level ?? 0),
+const tierLevel = (id: number) => tierOf(id)?.level ?? 0
+
+// Здесь по умолчанию — по важности: что горит сильнее, то и сверху.
+const { filters, reset: resetFilters } = useQuestFilters({ sort: 'tier' })
+const filtering = computed(() => activeFilterCount(filters) > 0 || filters.q.trim() !== '')
+const compare = computed(() => questComparator(filters.sort, tierLevel))
+
+const board = computed(() => {
+  // Срок не фильтруем: страница и так разложена по сроку.
+  const shown = filterQuests(
+    quests.active,
+    { ...filters, due: 'all' },
+    { now: now.value, tierLevel },
+  )
+  return todayBoard(shown, now.value, timezone.value, compare.value)
+})
+const total = computed(() =>
+  boardSize(todayBoard(quests.active, now.value, timezone.value, compare.value)),
+)
+
+const todayGroups = computed(() =>
+  [
+    { key: 'once', title: 'Разовые', quests: board.value.today.once },
+    { key: 'recurring', title: 'Повторяющиеся', quests: board.value.today.recurring },
+  ].filter((group) => group.quests.length),
+)
+const todayLength = computed(
+  () => board.value.today.once.length + board.value.today.recurring.length,
 )
 
 const dateTitle = computed(() =>
@@ -96,7 +125,7 @@ const stats = computed(() => {
       <h1 class="page-title">
         Сегодня
         <HelpHint
-          text="Квесты со сроком на сегодня — важные сверху, итог дня и идущий отдых. «Сегодня» считается по часовому поясу из профиля."
+          text="Квесты со сроком на сегодня — разовые первыми, повторяющиеся ниже; итог дня и идущий отдых. Поиск, фильтры и сортировка — над списком. «Сегодня» считается по часовому поясу из профиля."
         />
       </h1>
       <p class="page-subtitle date">{{ dateTitle }}</p>
@@ -141,6 +170,17 @@ const stats = computed(() => {
       <SessionList size="large" />
     </section>
 
+    <QuestFilters
+      v-if="quests.active.length"
+      v-model:filters="filters"
+      :shown="boardSize(board)"
+      :total="total"
+      hide-due
+      placeholder="Поиск по сегодняшним"
+      class="block"
+      @reset="resetFilters"
+    />
+
     <section v-if="board.overdue.length" class="block">
       <h2 class="block-title late">Срок вышел</h2>
       <QuestCard
@@ -157,12 +197,22 @@ const stats = computed(() => {
       <h2 class="block-title">
         На сегодня
         <HelpHint
-          text="Квесты со сроком до конца дня. Сдали или провалили по ошибке — «Отменить» работает 10 минут."
+          text="Квесты со сроком до конца дня. Сначала разовые — их вы повесили ради конкретного дела, ниже повторяющиеся по расписанию. Сдали или провалили по ошибке — «Отменить» работает 10 минут."
         />
-        <span v-if="board.today.length" class="count">({{ board.today.length }})</span>
+        <span v-if="todayLength" class="count">({{ todayLength }})</span>
       </h2>
       <EmptyState
-        v-if="!board.today.length"
+        v-if="!todayLength && filtering"
+        art="rest"
+        text="Под фильтры на сегодня ничего не подошло."
+        compact
+      >
+        <button type="button" class="link-button board-link" @click="resetFilters">
+          Сбросить фильтры
+        </button>
+      </EmptyState>
+      <EmptyState
+        v-else-if="!todayLength"
         art="rest"
         :text="
           board.noDue.length
@@ -173,19 +223,25 @@ const stats = computed(() => {
       >
         <RouterLink to="/quests" class="board-link">Вся доска</RouterLink>
       </EmptyState>
-      <QuestCard
-        v-for="quest in board.today"
-        :key="quest.id"
-        :quest="quest"
-        :tier="tierOf(quest.tier_id)"
-        :category="categoryOf(quest)"
-        :now="now"
-        :busy="busyId === quest.id"
-        @complete="complete(quest, $event)"
-        @fail="fail(quest)"
-        @edit="open(quest)"
-        @archive="archive(quest)"
-      />
+      <div v-for="group in todayGroups" :key="group.key" class="group">
+        <h3 class="group-title">
+          <AppIcon v-if="group.key === 'recurring'" name="repeat" :size="14" />
+          {{ group.title }} · {{ group.quests.length }}
+        </h3>
+        <QuestCard
+          v-for="quest in group.quests"
+          :key="quest.id"
+          :quest="quest"
+          :tier="tierOf(quest.tier_id)"
+          :category="categoryOf(quest)"
+          :now="now"
+          :busy="busyId === quest.id"
+          @complete="complete(quest, $event)"
+          @fail="fail(quest)"
+          @edit="open(quest)"
+          @archive="archive(quest)"
+        />
+      </div>
     </section>
 
     <NCollapse v-if="board.noDue.length" class="block">
@@ -295,6 +351,21 @@ const stats = computed(() => {
   background-color: var(--color-note);
   background-image: var(--paper-grain);
   box-shadow: var(--shadow-note);
+}
+
+.group + .group {
+  margin-top: 14px;
+}
+
+.group-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 8px;
+  color: var(--color-muted);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
 }
 
 .board-link {

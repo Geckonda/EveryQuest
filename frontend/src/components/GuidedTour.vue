@@ -48,8 +48,10 @@ function close() {
 
 function onKey(event: KeyboardEvent) {
   if (event.key === 'Escape') close()
-  else if (event.key === 'ArrowRight' || event.key === 'Enter') isLast.value ? close() : go(1)
-  else if (event.key === 'ArrowLeft') go(-1)
+  else if (event.key === 'ArrowRight' || event.key === 'Enter') {
+    if (isLast.value) close()
+    else go(1)
+  } else if (event.key === 'ArrowLeft') go(-1)
 }
 
 watch(

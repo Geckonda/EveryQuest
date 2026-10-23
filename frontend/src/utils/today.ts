@@ -1,5 +1,5 @@
 import type { Quest } from '@/api/types'
-import { byDue } from './questFilters'
+import { isRecurring } from './questFilters'
 
 const keyFormats = new Map<string, Intl.DateTimeFormat>()
 
@@ -22,8 +22,8 @@ export function dayKey(date: Date | string, timeZone: string): string {
 export interface TodayBoard {
   /** Срок вышел, а штраф ещё не списан. */
   overdue: Quest[]
-  /** Срок сегодня: важные сверху, внутри тира — по сроку. */
-  today: Quest[]
+  /** Срок сегодня: разовые отдельно от повторяющихся. */
+  today: { once: Quest[]; recurring: Quest[] }
   /** Побочные — без срока. */
   noDue: Quest[]
   /** Сколько квестов со сроком сегодня (включая просроченные). */
@@ -33,12 +33,15 @@ export interface TodayBoard {
 /**
  * Раскладка активных квестов для страницы «Сегодня». «Сегодня» — по часовому поясу
  * из профиля, как у повторяющихся квестов: иначе в поездке день «съезжал» бы.
+ *
+ * Разовые идут первыми: их повесили руками ради конкретного дела, а повторяющиеся —
+ * рутина, которая появится снова. Внутри — порядок `compare`.
  */
 export function todayBoard(
   quests: Quest[],
   now: Date,
   timeZone: string,
-  tierLevel: (tierId: number) => number,
+  compare: (a: Quest, b: Quest) => number,
 ): TodayBoard {
   const todayKey = dayKey(now, timeZone)
   const overdue: Quest[] = []
@@ -51,13 +54,27 @@ export function todayBoard(
     else if (dayKey(quest.due_at, timeZone) === todayKey) dueToday.push(quest)
   }
 
-  const byImportance = (a: Quest, b: Quest) =>
-    tierLevel(b.tier_id) - tierLevel(a.tier_id) || byDue(a, b)
+  const onceFirst = (a: Quest, b: Quest) =>
+    Number(isRecurring(a)) - Number(isRecurring(b)) || compare(a, b)
+  dueToday.sort(compare)
 
   return {
-    overdue: overdue.sort(byDue),
-    today: dueToday.sort(byImportance),
-    noDue: noDue.sort(byImportance),
+    overdue: overdue.sort(onceFirst),
+    today: {
+      once: dueToday.filter((q) => !isRecurring(q)),
+      recurring: dueToday.filter(isRecurring),
+    },
+    noDue: noDue.sort(onceFirst),
     todayCount: overdue.length + dueToday.length,
   }
+}
+
+/** Сколько квестов видно на странице «Сегодня». */
+export function boardSize(board: TodayBoard): number {
+  return (
+    board.overdue.length +
+    board.today.once.length +
+    board.today.recurring.length +
+    board.noDue.length
+  )
 }

@@ -2,6 +2,8 @@ import type { Quest } from '@/api/types'
 
 export type DueFilter = 'all' | 'overdue' | 'today' | 'week' | 'none'
 export type QuestSort = 'due' | 'tier' | 'reward'
+/** Разовые — повешены вручную, повторяющиеся — созданы по расписанию. */
+export type QuestKind = 'all' | 'once' | 'recurring'
 
 export interface QuestFilters {
   /** Поиск по названию и описанию, без учёта регистра. */
@@ -10,7 +12,7 @@ export interface QuestFilters {
   tiers: number[]
   categories: number[]
   due: DueFilter
-  onlyRecurring: boolean
+  kind: QuestKind
   sort: QuestSort
 }
 
@@ -19,7 +21,7 @@ export const DEFAULT_FILTERS: QuestFilters = {
   tiers: [],
   categories: [],
   due: 'all',
-  onlyRecurring: false,
+  kind: 'all',
   sort: 'due',
 }
 
@@ -29,7 +31,7 @@ export function activeFilterCount(f: QuestFilters): number {
     Number(f.tiers.length > 0) +
     Number(f.categories.length > 0) +
     Number(f.due !== 'all') +
-    Number(f.onlyRecurring)
+    Number(f.kind !== 'all')
   )
 }
 
@@ -61,6 +63,24 @@ export function byDue(a: Quest, b: Quest): number {
   return a.due_at < b.due_at ? -1 : 1
 }
 
+export const isRecurring = (quest: Quest) => quest.recurring_quest_id !== null
+
+/** Порядок квестов для выбранной сортировки; при равенстве — по сроку. */
+export function questComparator(
+  sort: QuestSort,
+  tierLevel: (tierId: number) => number,
+): (a: Quest, b: Quest) => number {
+  switch (sort) {
+    case 'due':
+      return byDue
+    // Важные сверху, внутри уровня — по сроку.
+    case 'tier':
+      return (a, b) => tierLevel(b.tier_id) - tierLevel(a.tier_id) || byDue(a, b)
+    case 'reward':
+      return (a, b) => b.reward - a.reward || byDue(a, b)
+  }
+}
+
 /**
  * Отбор и сортировка активных квестов доски. Время — в часовом поясе браузера,
  * как и подпись срока на карточке.
@@ -81,15 +101,8 @@ export function filterQuests(
       (!f.tiers.length || f.tiers.includes(quest.tier_id)) &&
       (!f.categories.length ||
         (quest.category_id !== null && f.categories.includes(quest.category_id))) &&
-      (!f.onlyRecurring || quest.recurring_quest_id !== null) &&
+      (f.kind === 'all' || (f.kind === 'recurring') === isRecurring(quest)) &&
       matchesDue(quest, f.due, ctx.now),
   )
-
-  const compare: Record<QuestSort, (a: Quest, b: Quest) => number> = {
-    due: byDue,
-    // Важные сверху, внутри уровня — по сроку.
-    tier: (a, b) => ctx.tierLevel(b.tier_id) - ctx.tierLevel(a.tier_id) || byDue(a, b),
-    reward: (a, b) => b.reward - a.reward || byDue(a, b),
-  }
-  return result.sort(compare[f.sort])
+  return result.sort(questComparator(f.sort, ctx.tierLevel))
 }

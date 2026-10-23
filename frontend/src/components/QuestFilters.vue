@@ -1,11 +1,15 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { NBadge, NButton, NCheckbox, NCollapseTransition, NInput, NSelect } from 'naive-ui'
+import { NBadge, NButton, NCollapseTransition, NInput, NSelect } from 'naive-ui'
 import { useCatalogStore } from '@/stores/catalog'
 import { activeFilterCount, type QuestFilters } from '@/utils/questFilters'
 
 const filters = defineModel<QuestFilters>('filters', { required: true })
-defineProps<{ shown: number; total: number }>()
+// hideDue — на «Сегодня» квесты и так разложены по сроку.
+withDefaults(
+  defineProps<{ shown: number; total: number; hideDue?: boolean; placeholder?: string }>(),
+  { hideDue: false, placeholder: 'Поиск по доске' },
+)
 defineEmits<{ reset: [] }>()
 
 const catalog = useCatalogStore()
@@ -29,6 +33,11 @@ const dueOptions = [
   { label: 'На этой неделе', value: 'week' },
   { label: 'Без срока', value: 'none' },
 ]
+const kindOptions = [
+  { label: 'Разовые и повторяющиеся', value: 'all' },
+  { label: 'Только разовые', value: 'once' },
+  { label: 'Только повторяющиеся', value: 'recurring' },
+]
 const sortOptions = [
   { label: 'По сроку', value: 'due' },
   { label: 'По важности', value: 'tier' },
@@ -42,7 +51,7 @@ const sortOptions = [
       <NInput
         v-model:value="filters.q"
         clearable
-        placeholder="Поиск по доске"
+        :placeholder="placeholder"
         class="search"
         size="small"
       />
@@ -79,8 +88,8 @@ const sortOptions = [
           placeholder="Все категории"
           max-tag-count="responsive"
         />
-        <NSelect v-model:value="filters.due" :options="dueOptions" size="small" />
-        <NCheckbox v-model:checked="filters.onlyRecurring">Только повторяющиеся</NCheckbox>
+        <NSelect v-if="!hideDue" v-model:value="filters.due" :options="dueOptions" size="small" />
+        <NSelect v-model:value="filters.kind" :options="kindOptions" size="small" />
       </div>
     </NCollapseTransition>
 

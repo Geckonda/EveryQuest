@@ -14,7 +14,7 @@ describe('фильтры в адресе', () => {
       tiers: [1, 3],
       categories: [7],
       due: 'week' as const,
-      onlyRecurring: true,
+      kind: 'recurring' as const,
       sort: 'tier' as const,
     }
     const query = toQuery(filters)
@@ -23,7 +23,7 @@ describe('фильтры в адресе', () => {
       tier: ['1', '3'],
       cat: ['7'],
       due: 'week',
-      rec: '1',
+      kind: 'recurring',
       sort: 'tier',
     })
     expect(fromQuery(query as never)).toEqual(filters)
@@ -31,8 +31,26 @@ describe('фильтры в адресе', () => {
 
   it('мусор в адресе игнорируется', () => {
     expect(
-      fromQuery({ tier: ['x', '-1', '2'], due: 'yesterday', sort: 'random', rec: 'yes' }),
+      fromQuery({
+        tier: ['x', '-1', '2'],
+        due: 'yesterday',
+        sort: 'random',
+        rec: 'yes',
+        kind: 'some',
+      }),
     ).toEqual({ ...DEFAULT_FILTERS, tiers: [2] })
+  })
+
+  it('старые ссылки с rec=1 — повторяющиеся', () => {
+    expect(fromQuery({ rec: '1' }).kind).toBe('recurring')
+  })
+
+  it('свои значения по умолчанию страницы в адрес не пишутся', () => {
+    const defaults = { ...DEFAULT_FILTERS, sort: 'tier' as const }
+    expect(toQuery(defaults, defaults)).toEqual({})
+    expect(fromQuery({}, defaults)).toEqual(defaults)
+    // Отличие от умолчаний страницы пишется, даже если совпадает с общими.
+    expect(toQuery({ ...defaults, sort: 'due' }, defaults)).toEqual({ sort: 'due' })
   })
 
   it('одиночное значение вместо массива', () => {
