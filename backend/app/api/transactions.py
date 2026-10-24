@@ -3,7 +3,7 @@ from typing import Annotated
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, HTTPException, Query, status
-from sqlalchemy import func, select, tuple_
+from sqlalchemy import case, func, select, tuple_
 from sqlalchemy.orm import Session
 
 from app.db import DbSession
@@ -85,15 +85,22 @@ def today_summary(user: CurrentUser, db: DbSession) -> DaySummary:
     start = datetime.combine(day, time(), tzinfo=ZoneInfo(user.timezone))
     # Следующая полночь — через combine, а не +24 ч: в день перехода на летнее время их 23 или 25.
     end = datetime.combine(day + timedelta(days=1), time(), tzinfo=ZoneInfo(user.timezone))
+    # Отмена сдачи или провала (reversal) гасит исходную запись: −награда уменьшает
+    # «заработано», +штраф — «штрафы». Иначе после «Отменить» итог дня расходился бы с кошелём.
+    kind = case(
+        (Transaction.type != "reversal", Transaction.type),
+        (Transaction.amount < 0, "quest_reward"),
+        else_="penalty",
+    )
     sums = dict(
         db.execute(
-            select(Transaction.type, func.sum(Transaction.amount))
+            select(kind, func.sum(Transaction.amount))
             .where(
                 Transaction.user_id == user.id,
                 Transaction.created_at >= start,
                 Transaction.created_at < end,
             )
-            .group_by(Transaction.type)
+            .group_by(kind)
         ).all()
     )
     return DaySummary(

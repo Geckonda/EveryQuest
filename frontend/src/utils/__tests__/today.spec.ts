@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Quest } from '@/api/types'
 import { questComparator } from '../questFilters'
-import { boardSize, dayKey, todayBoard } from '../today'
+import { boardSize, dayKey, todayBoard, todayStakes } from '../today'
 
 function quest(id: number, due_at: string | null, tier_id = 1, recurring = false): Quest {
   return {
@@ -96,5 +96,33 @@ describe('todayBoard', () => {
     const late = [quest(1, '2026-10-21T21:30:00Z')]
     expect(todayBoard(late, now, 'UTC', byTier).todayCount).toBe(1)
     expect(todayBoard(late, now, 'Asia/Tokyo', byTier).todayCount).toBe(0)
+  })
+})
+
+describe('todayStakes', () => {
+  const now = new Date('2026-10-21T10:00:00Z')
+  const withMoney = (q: Quest, reward: number, penalty: number) => ({ ...q, reward, penalty })
+
+  it('награды и штрафы оставшихся на сегодня, без просроченных, завтрашних и без срока', () => {
+    const board = todayBoard(
+      [
+        withMoney(quest(1, '2026-10-21T09:00:00Z'), 1000, 1000), // срок вышел
+        withMoney(quest(2, '2026-10-21T19:00:00Z'), 50, 75), // сегодня, разовый
+        withMoney(quest(3, '2026-10-21T12:00:00Z', 1, true), 20, 10), // сегодня, повторяющийся
+        withMoney(quest(4, '2026-10-22T12:00:00Z'), 500, 500), // завтра
+        withMoney(quest(5, null), 300, 300), // без срока
+      ],
+      now,
+      'UTC',
+      byTier,
+    )
+    expect(todayStakes(board)).toEqual({ reward: 70, penalty: 85 })
+  })
+
+  it('срок прошёл — квест выпадает из «можно заработать»', () => {
+    const quests = [withMoney(quest(1, '2026-10-21T12:00:00Z'), 50, 75)]
+    expect(todayStakes(todayBoard(quests, now, 'UTC', byTier))).toEqual({ reward: 50, penalty: 75 })
+    const later = new Date('2026-10-21T12:00:01Z')
+    expect(todayStakes(todayBoard(quests, later, 'UTC', byTier))).toEqual({ reward: 0, penalty: 0 })
   })
 })

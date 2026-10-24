@@ -31,6 +31,11 @@ export function signed(n: number): string {
   return n > 0 ? `+${n}` : n < 0 ? `−${Math.abs(n)}` : '0'
 }
 
+/** Число без плюса, но с настоящим минусом «−», как у signed: баланс бывает в долгу. */
+export function amount(n: number): string {
+  return n < 0 ? `−${Math.abs(n)}` : String(n)
+}
+
 const timeFormat = new Intl.DateTimeFormat('ru', { hour: '2-digit', minute: '2-digit' })
 const dateFormat = new Intl.DateTimeFormat('ru', { day: 'numeric', month: 'short' })
 const dateTimeFormat = new Intl.DateTimeFormat('ru', {

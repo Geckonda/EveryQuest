@@ -200,6 +200,17 @@ def test_today_summary(client: TestClient, db: Session, headers: dict[str, str])
         "manual": -5,
     }
 
+    # «Отменить» сдачу и провал — итог дня возвращается, как будто их не было.
+    undone = client.post(
+        f"{API}/quests", headers=headers, json={"name": "Мимо", "tier_id": tier_id, "reward": 40}
+    ).json()
+    client.post(f"{API}/quests/{undone['id']}/complete", headers=headers)
+    assert client.get(f"{API}/transactions/today", headers=headers).json()["earned"] == 140
+    client.post(f"{API}/quests/{undone['id']}/undo", headers=headers)
+    client.post(f"{API}/quests/{quest['id']}/undo", headers=headers)
+    after_undo = client.get(f"{API}/transactions/today", headers=headers).json()
+    assert (after_undo["earned"], after_undo["penalties"]) == (100, 0)
+
     stranger = auth_headers(register(client, email="stranger@example.com"))
     empty = client.get(f"{API}/transactions/today", headers=stranger).json()
     assert (empty["earned"], empty["spent"], empty["penalties"], empty["manual"]) == (0, 0, 0, 0)

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  amount,
   canUndo,
   coins,
   countdown,
@@ -70,6 +71,14 @@ describe('signed', () => {
     expect(signed(50)).toBe('+50')
     expect(signed(-30)).toBe('−30')
     expect(signed(0)).toBe('0')
+  })
+})
+
+describe('amount', () => {
+  it('без плюса, минус — настоящий', () => {
+    expect(amount(75)).toBe('75')
+    expect(amount(-75)).toBe('−75')
+    expect(amount(0)).toBe('0')
   })
 })
 

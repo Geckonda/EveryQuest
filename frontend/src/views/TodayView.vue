@@ -11,9 +11,9 @@ import { useAuthStore } from '@/stores/auth'
 import { useCatalogStore } from '@/stores/catalog'
 import { useQuestsStore } from '@/stores/quests'
 import { useSessionsStore } from '@/stores/sessions'
-import { signed } from '@/utils/format'
+import { amount, signed } from '@/utils/format'
 import { activeFilterCount, filterQuests, questComparator } from '@/utils/questFilters'
-import { boardSize, todayBoard } from '@/utils/today'
+import { boardSize, todayBoard, todayStakes } from '@/utils/today'
 import CoinIcon from '@/components/CoinIcon.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import QuestCard from '@/components/QuestCard.vue'
@@ -84,9 +84,14 @@ const board = computed(() => {
   )
   return todayBoard(shown, now.value, timezone.value, compare.value)
 })
-const total = computed(() =>
-  boardSize(todayBoard(quests.active, now.value, timezone.value, compare.value)),
+// Без фильтров: «Найдено N из M» и то, что на кону сегодня, — по всей картине дня.
+const fullBoard = computed(() =>
+  todayBoard(quests.active, now.value, timezone.value, compare.value),
 )
+const total = computed(() => boardSize(fullBoard.value))
+// Пересчитывается сам: сдали, провалили, отменили — меняется quests.active;
+// срок вышел — квест уходит в «Срок вышел» на очередном тике now.
+const stakes = computed(() => todayStakes(fullBoard.value))
 
 const todayGroups = computed(() =>
   [
@@ -156,7 +161,17 @@ const stats = computed(() => {
       </div>
       <div class="stat purse">
         <span class="stat-label">В кошеле</span>
-        <span class="stat-value num"><CoinIcon :size="16" /> {{ auth.user?.balance ?? 0 }}</span>
+        <span class="stat-value num"
+          ><CoinIcon :size="16" /> {{ amount(auth.user?.balance ?? 0) }}</span
+        >
+      </div>
+      <div class="stat chance" title="Награды квестов на сегодня, срок которых ещё не вышел">
+        <span class="stat-label">Можно заработать</span>
+        <span class="stat-value num">{{ signed(stakes.reward) }}</span>
+      </div>
+      <div class="stat risk" title="Штрафы квестов на сегодня, если не сдать их до срока">
+        <span class="stat-label">Можно потерять</span>
+        <span class="stat-value num">{{ signed(-stakes.penalty) }}</span>
       </div>
     </div>
 
@@ -324,6 +339,17 @@ const stats = computed(() => {
 
 .loss .stat-value {
   color: var(--color-error);
+}
+
+/* Ещё не случилось — те же цвета, но приглушённо. */
+.chance .stat-value {
+  color: var(--color-gold);
+  opacity: 0.75;
+}
+
+.risk .stat-value {
+  color: var(--color-error);
+  opacity: 0.75;
 }
 
 .block {

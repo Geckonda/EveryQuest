@@ -78,3 +78,16 @@ export function boardSize(board: TodayBoard): number {
     board.noDue.length
   )
 }
+
+/**
+ * Что ещё на кону сегодня: награды и штрафы квестов со сроком до конца дня, который
+ * ещё не вышел. Просроченные не считаются — сдать их уже нельзя, а штраф попадёт
+ * в «Штрафы», когда гильдия его взыщет. Побочные без срока — не сегодняшние.
+ */
+export function todayStakes(board: TodayBoard): { reward: number; penalty: number } {
+  const quests = [...board.today.once, ...board.today.recurring]
+  return {
+    reward: quests.reduce((sum, q) => sum + q.reward, 0),
+    penalty: quests.reduce((sum, q) => sum + q.penalty, 0),
+  }
+}

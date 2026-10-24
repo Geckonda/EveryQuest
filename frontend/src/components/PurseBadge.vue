@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onUnmounted, ref, watch } from 'vue'
 import { useAuthStore, type CoinReason } from '@/stores/auth'
-import { signed } from '@/utils/format'
+import { amount, signed } from '@/utils/format'
 import { playSound, type SoundKind } from '@/utils/sound'
 import CoinIcon from './CoinIcon.vue'
 
@@ -76,7 +76,7 @@ onUnmounted(() => {
     data-tour="purse"
   >
     <CoinIcon :size="18" />
-    {{ shown }}
+    {{ amount(shown) }}
     <span
       v-for="f in floats"
       :key="f.id"
