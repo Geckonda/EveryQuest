@@ -69,20 +69,30 @@ export function useQuestActions() {
     )
   }
 
-  async function complete(quest: Quest, event: MouseEvent) {
-    // Точка старта — до запроса: после него карточка уйдёт с доски.
+  /** Сдача — с подтверждением: кнопка большая, задеть её пальцем легко. */
+  function complete(quest: Quest, event: MouseEvent) {
+    // Точка старта — до диалога и запроса: currentTarget есть только во время клика,
+    // а после запроса карточка уйдёт с доски.
     const from = pointOf(event.currentTarget as Element | null)
-    busyId.value = quest.id
-    try {
-      await quests.complete(quest.id)
-      flyCoins(from, purseElement())
-      withUndo('success', `Квест «${quest.name}» сдан. Награда: ${coins(quest.reward)}.`, quest)
-    } catch (e) {
-      message.error(errorMessage(e))
-      await quests.loadActive().catch(() => {})
-    } finally {
-      busyId.value = null
-    }
+    dialog.success({
+      title: 'Сдать квест?',
+      content: `«${quest.name}» уйдёт в архив, в кошель — награда: ${coins(quest.reward)}.`,
+      positiveText: 'Сдать',
+      negativeText: 'Отмена',
+      onPositiveClick: async () => {
+        busyId.value = quest.id
+        try {
+          await quests.complete(quest.id)
+          flyCoins(from, purseElement())
+          withUndo('success', `Квест «${quest.name}» сдан. Награда: ${coins(quest.reward)}.`, quest)
+        } catch (e) {
+          message.error(errorMessage(e))
+          await quests.loadActive().catch(() => {})
+        } finally {
+          busyId.value = null
+        }
+      },
+    })
   }
 
   function fail(quest: Quest) {
