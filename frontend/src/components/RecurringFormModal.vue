@@ -22,6 +22,7 @@ import { errorMessage } from '@/api/errors'
 import { useCatalogStore } from '@/stores/catalog'
 import { useRecurringStore } from '@/stores/recurring'
 import { useRewardFields } from '@/composables/useRewardFields'
+import { useAuthStore } from '@/stores/auth'
 import PenaltyHint from './PenaltyHint.vue'
 import { plural } from '@/utils/format'
 import { WEEKDAYS, describeSchedule } from '@/utils/schedule'
@@ -32,6 +33,7 @@ const show = defineModel<boolean>('show', { required: true })
 
 const catalog = useCatalogStore()
 const recurring = useRecurringStore()
+const auth = useAuthStore()
 const message = useMessage()
 
 function todayIso(): string {
@@ -92,7 +94,8 @@ watch(show, (opened) => {
     interval: t?.interval ?? 1,
     daysOfWeek: t?.days_of_week ?? [],
     dayOfMonth: t?.day_of_month ?? null,
-    dueTime: t?.due_time.slice(0, 5) ?? '23:59',
+    // Новый шаблон — «до» времени из профиля.
+    dueTime: (t?.due_time ?? auth.user?.default_due_time ?? '23:59').slice(0, 5),
     startDate: t?.start_date ?? todayIso(),
     endDate: t?.end_date ?? null,
   })

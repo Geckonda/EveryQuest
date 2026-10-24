@@ -22,10 +22,15 @@ export interface User {
   timezone: string
   /** Штраф нового квеста по умолчанию = награда × множитель. */
   penalty_multiplier: number
+  /** Срок нового квеста по умолчанию, «ЧЧ:ММ:СС» по часам пользователя. */
+  default_due_time: string
   created_at: string
 }
 
-export type UserPayload = Pick<User, 'username' | 'timezone' | 'penalty_multiplier'>
+export type UserPayload = Pick<
+  User,
+  'username' | 'timezone' | 'penalty_multiplier' | 'default_due_time'
+>
 
 export interface RegisterPayload {
   email: string

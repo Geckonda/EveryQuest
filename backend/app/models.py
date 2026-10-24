@@ -53,6 +53,10 @@ class User(Base):
     penalty_multiplier: Mapped[Decimal] = mapped_column(
         Numeric(4, 2), server_default="1", nullable=False
     )
+    # Срок нового квеста по умолчанию — «конец дня» пользователя; в форме его можно поменять.
+    default_due_time: Mapped[time] = mapped_column(
+        Time, server_default=text("'23:59'"), nullable=False
+    )
     created_at: Mapped[datetime] = created_at_column()
 
 

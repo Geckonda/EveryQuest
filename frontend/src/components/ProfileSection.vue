@@ -11,6 +11,7 @@ import {
   NRadioGroup,
   NSelect,
   NSwitch,
+  NTimePicker,
   useDialog,
   useMessage,
 } from 'naive-ui'
@@ -36,6 +37,7 @@ const form = reactive({
   username: '',
   timezone: 'UTC',
   multiplier: 1 as number | null,
+  dueTime: '23:59' as string | null,
 })
 const error = ref<string | null>(null)
 const saving = ref(false)
@@ -48,6 +50,7 @@ watch(
       username: user.username,
       timezone: user.timezone,
       multiplier: user.penalty_multiplier,
+      dueTime: user.default_due_time.slice(0, 5),
     })
   },
   { immediate: true },
@@ -58,7 +61,9 @@ const timezoneOptions = Intl.supportedValuesOf('timeZone').map((tz) => ({ label:
 
 const example = computed(() => (form.multiplier === null ? null : penaltyFor(50, form.multiplier)))
 
-const isComplete = computed(() => form.username.trim() !== '' && form.multiplier !== null)
+const isComplete = computed(
+  () => form.username.trim() !== '' && form.multiplier !== null && form.dueTime !== null,
+)
 
 const tour = useTour()
 const { canInstall, isStandalone, isIos, install } = useInstall()
@@ -94,7 +99,7 @@ function confirmLogoutAll() {
 }
 
 async function save() {
-  if (!isComplete.value || form.multiplier === null) return
+  if (!isComplete.value || form.multiplier === null || form.dueTime === null) return
   error.value = null
   saving.value = true
   try {
@@ -102,6 +107,7 @@ async function save() {
       username: form.username.trim(),
       timezone: form.timezone,
       penalty_multiplier: form.multiplier,
+      default_due_time: form.dueTime,
     })
     message.success('Профиль сохранён')
   } catch (e) {
@@ -143,9 +149,22 @@ async function save() {
         <template v-if="example !== null">За квест на 50 — штраф {{ example }}</template>
       </template>
     </NFormItem>
+    <NFormItem>
+      <template #label
+        >Срок сдачи по умолчанию
+        <HelpHint
+          text="Когда для вас кончается день сдачи квестов. Новый квест получит срок «сегодня в это время» (если оно уже прошло — завтра), повторяющийся — «до этого времени». В форме срок всегда можно поменять."
+      /></template>
+      <NTimePicker
+        v-model:formatted-value="form.dueTime"
+        value-format="HH:mm"
+        format="HH:mm"
+        :actions="null"
+      />
+    </NFormItem>
     <p class="hint">
-      Штраф нового квеста = награда × множитель; в форме квеста его можно поменять. По часовому
-      поясу появляются повторяющиеся квесты.
+      Штраф нового квеста = награда × множитель; срок — сегодня в выбранное время. В форме квеста
+      оба можно поменять. По часовому поясу появляются повторяющиеся квесты.
     </p>
     <NAlert v-if="error" type="error" class="error">{{ error }}</NAlert>
     <NButton type="primary" attr-type="submit" :loading="saving" :disabled="!isComplete">

@@ -23,6 +23,16 @@ def _check_timezone(value: str) -> str:
 
 
 TimeZoneName = Annotated[str, AfterValidator(_check_timezone)]
+
+
+def _check_whole_minute(value: time) -> time:
+    # Время на часах пользователя: без пояса и секунд — как в форме «ЧЧ:ММ».
+    if value.tzinfo is not None or value.second or value.microsecond:
+        raise ValueError("Время — в часах и минутах, без секунд и пояса")
+    return value
+
+
+WholeMinute = Annotated[time, AfterValidator(_check_whole_minute)]
 Username = Annotated[str, Field(min_length=1, max_length=64)]
 ShortName = Annotated[str, Field(min_length=1, max_length=64)]
 LongName = Annotated[str, Field(min_length=1, max_length=200)]
@@ -102,6 +112,7 @@ class UserOut(ORMModel):
     timezone: str
     # Число, а не Decimal: иначе в JSON уйдёт строкой «1.00».
     penalty_multiplier: float
+    default_due_time: time
     created_at: datetime
 
 
@@ -109,6 +120,7 @@ class UserUpdate(PatchModel):
     username: Username | None = None
     timezone: TimeZoneName | None = None
     penalty_multiplier: PenaltyMultiplier | None = None
+    default_due_time: WholeMinute | None = None
 
 
 # --- тиры ---

@@ -17,6 +17,8 @@ import { errorMessage } from '@/api/errors'
 import { useCatalogStore } from '@/stores/catalog'
 import { useQuestsStore } from '@/stores/quests'
 import { useRewardFields } from '@/composables/useRewardFields'
+import { useAuthStore } from '@/stores/auth'
+import { atTime, defaultDue } from '@/utils/defaultDue'
 import PenaltyHint from './PenaltyHint.vue'
 import HelpHint from './HelpHint.vue'
 
@@ -25,6 +27,7 @@ const show = defineModel<boolean>('show', { required: true })
 
 const catalog = useCatalogStore()
 const quests = useQuestsStore()
+const auth = useAuthStore()
 const message = useMessage()
 
 const form = reactive({
@@ -49,18 +52,19 @@ const categoryOptions = computed(() =>
   catalog.activeCategories.map((c) => ({ label: c.name, value: c.id })),
 )
 
-function endOfDay(daysFromToday: number): number {
-  const d = new Date()
-  d.setDate(d.getDate() + daysFromToday)
-  d.setHours(23, 59, 0, 0)
-  return d.getTime()
-}
+/** «Конец дня» пользователя из профиля, «ЧЧ:ММ». */
+const dueTime = computed(() => auth.user?.default_due_time.slice(0, 5) ?? '23:59')
 
-const shortcuts = {
-  'Сегодня 23:59': () => endOfDay(0),
-  'Завтра 23:59': () => endOfDay(1),
-  'Через неделю': () => endOfDay(7),
-}
+// «Сегодня» — только пока это время не прошло: иначе кнопка ставила бы срок в прошлом.
+// Пересчитывается при каждом открытии формы (зависит от show).
+const shortcuts = computed(() => ({
+  ...(show.value &&
+    atTime(dueTime.value, 0) > Date.now() && {
+      [`Сегодня ${dueTime.value}`]: () => atTime(dueTime.value, 0),
+    }),
+  [`Завтра ${dueTime.value}`]: () => atTime(dueTime.value, 1),
+  'Через неделю': () => atTime(dueTime.value, 7),
+}))
 
 function isPastDay(ts: number): boolean {
   return ts < new Date().setHours(0, 0, 0, 0)
@@ -75,8 +79,8 @@ watch(show, (opened) => {
     name: q?.name ?? '',
     description: q?.description ?? null,
     categoryId: q?.category_id ?? null,
-    // Новый квест — по умолчанию до конца дня; у существующего срок как есть.
-    due: q ? (q.due_at ? new Date(q.due_at).getTime() : null) : endOfDay(0),
+    // Новый квест — по умолчанию до «конца дня» из профиля; у существующего срок как есть.
+    due: q ? (q.due_at ? new Date(q.due_at).getTime() : null) : defaultDue(dueTime.value),
   })
   if (q) reset(q.tier_id, q.reward, q.penalty)
   else reset(tier?.id ?? null, tier?.default_reward ?? null, null)

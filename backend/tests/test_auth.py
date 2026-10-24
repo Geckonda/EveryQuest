@@ -116,6 +116,21 @@ def test_penalty_multiplier(client: TestClient) -> None:
         assert rejected.status_code == 422, bad
 
 
+def test_default_due_time(client: TestClient) -> None:
+    headers = auth_headers(register(client))
+    # По умолчанию — как было до настройки: конец дня.
+    assert client.get("/api/v1/me", headers=headers).json()["default_due_time"] == "23:59:00"
+
+    response = client.patch("/api/v1/me", headers=headers, json={"default_due_time": "18:30"})
+    assert response.status_code == 200
+    assert response.json()["default_due_time"] == "18:30:00"
+    assert client.get("/api/v1/me", headers=headers).json()["default_due_time"] == "18:30:00"
+
+    for bad in ("25:00", "18:30:15", "18:30+03:00", "вечер", None):
+        rejected = client.patch("/api/v1/me", headers=headers, json={"default_due_time": bad})
+        assert rejected.status_code == 422, bad
+
+
 def test_users_see_only_their_own_data(client: TestClient) -> None:
     first = auth_headers(register(client, email="first@example.com"))
     second = auth_headers(register(client, email="second@example.com"))
