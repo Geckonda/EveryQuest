@@ -46,4 +46,11 @@ describe('groupByDay', () => {
     expect(days.get('2026-10-22')?.forecast.map((f) => f.recurring_quest_id)).toEqual([7])
     expect(days.size).toBe(2)
   })
+
+  it('внутри дня разовые первыми, порядок внутри групп сохраняется', () => {
+    const at = (id: number, recurring: boolean) =>
+      ({ id, due_at: '2026-10-21T10:00:00Z', recurring_quest_id: recurring ? 9 : null }) as Quest
+    const days = groupByDay([at(1, true), at(2, false), at(3, true), at(4, false)], [], 'UTC')
+    expect(days.get('2026-10-21')?.quests.map((q) => q.id)).toEqual([2, 4, 1, 3])
+  })
 })

@@ -1,4 +1,5 @@
 import type { ForecastQuest, Quest } from '@/api/types'
+import { isRecurring } from './questFilters'
 import { dayKey } from './today'
 
 /**
@@ -50,7 +51,11 @@ export interface DayItems {
   forecast: ForecastQuest[]
 }
 
-/** Квесты и прогноз по дням срока в поясе пользователя. */
+/**
+ * Квесты и прогноз по дням срока в поясе пользователя.
+ * Внутри дня разовые идут первыми, повторяющиеся — за ними: в ячейке помещается
+ * всего несколько отметок, и рутина не должна вытеснять за «+N» особые дела.
+ */
 export function groupByDay(
   quests: Quest[],
   forecast: ForecastQuest[],
@@ -65,5 +70,9 @@ export function groupByDay(
   }
   for (const quest of quests) if (quest.due_at) slot(quest.due_at).quests.push(quest)
   for (const item of forecast) slot(item.due_at).forecast.push(item)
+  // sort устойчивый: внутри группы остаётся порядок с сервера.
+  for (const items of days.values()) {
+    items.quests.sort((a, b) => Number(isRecurring(a)) - Number(isRecurring(b)))
+  }
   return days
 }
